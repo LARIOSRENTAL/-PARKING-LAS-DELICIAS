@@ -1,0 +1,35 @@
+name: Patch location card
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-location-link.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add Google Maps link
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old='<div class="benefit"><i class="fa-solid fa-location-dot"></i><strong>Ubicación privilegiada</strong><span>En pleno centro de Málaga, cerca de los principales puntos de interés.</span></div>'
+          new='<a class="benefit benefit-link" href="https://www.google.com/maps/search/?api=1&query=Parking+Las+Delicias+Calle+Don+Rodrigo+3+Malaga" target="_blank" rel="noopener" aria-label="Abrir Parking Las Delicias en Google Maps"><i class="fa-solid fa-location-dot"></i><strong>Ubicación privilegiada</strong><span>En pleno centro de Málaga, cerca de los principales puntos de interés.</span></a>'
+          if old not in s:
+              raise SystemExit('No se encontró el bloque de ubicación esperado')
+          s=s.replace(old,new,1)
+          css='.benefit-link{text-decoration:none;color:inherit;cursor:pointer;transition:.15s ease}.benefit-link:hover{transform:translateY(-2px);border-color:#9fc5b3;box-shadow:0 14px 34px rgba(38,60,80,.13)}'
+          s=s.replace('.benefit i{font-size:25px;color:var(--navy);margin-bottom:9px}',css+'.benefit i{font-size:25px;color:var(--navy);margin-bottom:9px}',1)
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Link parking location card to Google Maps"
+          git push
