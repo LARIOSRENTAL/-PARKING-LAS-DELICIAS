@@ -45,18 +45,104 @@ const paymentMethodLabel=m=>({cash:'Efectivo',card:'Tarjeta',hotel_voucher:'Bono
 function standardPrice(typeId,days){const t=tariffs.find(x=>x.vehicle_type_id===typeId&&Number(x.days)===Number(days));return t?Number(t.price_eur):null}
 function updateManualPaymentHint(){const el=document.getElementById('manualPaymentHint');if(!el)return;el.textContent=mPayment.value==='hotel_voucher'?'Bonos hotel: la reserva se creará con importe 0,00 € porque el bono ya está pagado.':'El precio se calculará automáticamente según categoría y duración.'}
 function statusTag(s){const m={pending_payment:['Pendiente pago','amber'],confirmed:['Confirmada','green'],checked_in:['Dentro','green'],completed:['Finalizada','gray'],cancelled:['Cancelada','red'],expired:['Caducada','red']};const v=m[s]||[s,'gray'];return `<span class="tag ${v[1]}">${esc(v[0])}</span>`}
-async function login(){const m=document.getElementById('loginMsg');m.innerHTML='<div class="msg">Abriendo turno…</div>';openingShift=true;const r=await db.auth.signInWithPassword({email:loginEmail.value.trim(),password:loginPass.value});if(r.error){openingShift=false;m.innerHTML=`<div class="msg error">${esc(r.error.message)}</div>`;return}currentSession=r.data.session;const sh=await db.rpc('open_staff_shift');if(sh.error){openingShift=false;await db.auth.signOut();m.innerHTML=`<div class="msg error">${esc(sh.error.message)}</div>`;return}openingShift=false;await boot()}
-async function logout(){await db.auth.signOut();location.reload()}
-async function closeShiftAndLogout(){if(!currentShift)return logout();if(!confirm('¿Cerrar el turno '+currentShift.shift_code+' y salir del backoffice?'))return;const r=await db.rpc('close_staff_shift');if(r.error)return alert('No se pudo cerrar el turno: '+r.error.message);await db.auth.signOut();location.reload()}
-async function boot(){const s=await db.auth.getSession();currentSession=s.data.session;if(!currentSession)return;const p=await db.from('staff_profiles').select('full_name,role,active').eq('user_id',currentSession.user.id).maybeSingle();if(p.error||!p.data||!p.data.active){loginMsg.innerHTML='<div class="msg error">Usuario no autorizado como empleado.</div>';return}currentProfile=p.data;const sh=await db.rpc('get_current_staff_shift');if(sh.error){loginMsg.innerHTML=`<div class="msg error">${esc(sh.error.message)}</div>`;return}if(!sh.data?.open){await db.auth.signOut();currentSession=null;currentProfile=null;loginView.classList.remove('hidden');mainView.classList.add('hidden');loginMsg.innerHTML='<div class="msg">Introduce tu usuario y contraseña para abrir turno.</div>';return}currentShift=sh.data;loginView.classList.add('hidden');mainView.classList.remove('hidden');shiftBox.classList.remove('hidden');who.textContent=`${p.data.full_name||currentSession.user.email} · ${roleLabel(p.data.role)}`;if(p.data.role==='admin')usersAreaButton.classList.remove('hidden');else usersAreaButton.classList.add('hidden');const [vt,sp,tr]=await Promise.all([db.from('vehicle_types').select('id,code,name,base_capacity,sort_order').order('sort_order'),db.from('parking_spots').select('id,code,vehicle_type_id,sort_order,active').eq('active',true).order('sort_order'),db.from('tariffs').select('vehicle_type_id,days,price_eur').order('days')]);vehicleTypes=vt.data||[];spots=sp.data||[];tariffs=tr.data||[];mType.innerHTML=vehicleTypes.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');rotTariff.innerHTML=vehicleTypes.map(v=>`<option value="${v.id}">${esc(v.name)} · SIN TARIFA HORARIA</option>`).join('');mDays.innerHTML=Array.from({length:24},(_,i)=>`<option value="${i+1}">${i+1} ${i?'días':'día'}</option>`).join('');const d=new Date(Date.now()+3600000);mEntry.value=localInput(d);configureManualDatePolicy();updateManualPaymentHint();planDate.value=localInput(new Date()).slice(0,10);renderShiftState();await refreshAll();showArea('stays')}
+async function login(){
+  const m=document.getElementById('loginMsg');
+  m.innerHTML='<div class="msg">Comprobando acceso…</div>';
+  openingShift=true;
+  const r=await db.auth.signInWithPassword({email:loginEmail.value.trim(),password:loginPass.value});
+  if(r.error){openingShift=false;m.innerHTML='<div class="msg error">'+esc(r.error.message)+'</div>';return}
+  currentSession=r.data.session;
+  const p=await db.from('staff_profiles').select('full_name,role,active').eq('user_id',currentSession.user.id).maybeSingle();
+  if(p.error||!p.data||!p.data.active){openingShift=false;await db.auth.signOut();m.innerHTML='<div class="msg error">Usuario no autorizado.</div>';return}
+  currentProfile=p.data;
+  if(p.data.role==='admin'){
+    currentAccessMode='free';sessionStorage.setItem('pld_access_mode','free');openingShift=false;await boot();return
+  }
+  if(p.data.role==='manager'){
+    openingShift=false;managerAccessModal.classList.remove('hidden');m.innerHTML='<div class="msg">Selecciona realizar turno o entrada libre.</div>';return
+  }
+  const sh=await db.rpc('open_staff_shift');
+  if(sh.error){openingShift=false;await db.auth.signOut();m.innerHTML='<div class="msg error">'+esc(sh.error.message)+'</div>';return}
+  currentAccessMode='shift';sessionStorage.setItem('pld_access_mode','shift');openingShift=false;await boot()
+}
+async function chooseManagerAccess(mode){
+  if(!currentSession||currentProfile?.role!=='manager')return;
+  if(mode==='shift'){
+    openingShift=true;
+    const sh=await db.rpc('open_staff_shift');
+    if(sh.error){openingShift=false;return alert('No se pudo abrir el turno: '+sh.error.message)}
+    currentAccessMode='shift';sessionStorage.setItem('pld_access_mode','shift');openingShift=false
+  }else{currentAccessMode='free';sessionStorage.setItem('pld_access_mode','free')}
+  managerAccessModal.classList.add('hidden');await boot()
+}
+async function cancelManagerAccess(){managerAccessModal.classList.add('hidden');sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()}
+async function logout(){sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()}
+async function closeShiftAndLogout(){
+  if(currentAccessMode==='free'||!currentShift)return logout();
+  if(!confirm('¿Cerrar el turno '+currentShift.shift_code+' y salir del backoffice?'))return;
+  const r=await db.rpc('close_staff_shift');
+  if(r.error)return alert('No se pudo cerrar el turno: '+r.error.message);
+  sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()
+}
+async function startManagerShiftFromFree(){
+  if(currentProfile?.role!=='manager'||currentAccessMode!=='free')return;
+  const r=await db.rpc('open_staff_shift');
+  if(r.error)return alert('No se pudo abrir el turno: '+r.error.message);
+  currentAccessMode='shift';sessionStorage.setItem('pld_access_mode','shift');await loadShiftState();renderShiftState();alert('Turno '+currentShift.shift_code+' abierto correctamente.')
+}
+async function boot(){
+  const s=await db.auth.getSession();currentSession=s.data.session;
+  if(!currentSession){loginView.classList.remove('hidden');mainView.classList.add('hidden');return}
+  const p=await db.from('staff_profiles').select('full_name,role,active').eq('user_id',currentSession.user.id).maybeSingle();
+  if(p.error||!p.data||!p.data.active){await db.auth.signOut();loginMsg.innerHTML='<div class="msg error">Usuario no autorizado.</div>';return}
+  currentProfile=p.data;
+  const sh=await db.rpc('get_current_staff_shift');
+  if(sh.error){loginMsg.innerHTML='<div class="msg error">'+esc(sh.error.message)+'</div>';return}
+  currentShift=sh.data?.open?sh.data:null;
+  const stored=sessionStorage.getItem('pld_access_mode');
+  if(p.data.role==='admin'){currentAccessMode='free';sessionStorage.setItem('pld_access_mode','free')}
+  else if(currentShift){currentAccessMode='shift';sessionStorage.setItem('pld_access_mode','shift')}
+  else if(p.data.role==='manager'&&stored==='free'){currentAccessMode='free'}
+  else if(p.data.role==='manager'){loginView.classList.remove('hidden');mainView.classList.add('hidden');managerAccessModal.classList.remove('hidden');return}
+  else{sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();currentSession=null;currentProfile=null;loginView.classList.remove('hidden');mainView.classList.add('hidden');loginMsg.innerHTML='<div class="msg">Introduce tu usuario y contraseña para abrir turno.</div>';return}
+  loginView.classList.add('hidden');mainView.classList.remove('hidden');shiftBox.classList.remove('hidden');
+  who.textContent=(p.data.full_name||currentSession.user.email)+' · '+roleLabel(p.data.role);
+  if(p.data.role==='admin')usersAreaButton.classList.remove('hidden');else usersAreaButton.classList.add('hidden');
+  const [vt,sp,tr]=await Promise.all([db.from('vehicle_types').select('id,code,name,base_capacity,sort_order').order('sort_order'),db.from('parking_spots').select('id,code,vehicle_type_id,sort_order,active').eq('active',true).order('sort_order'),db.from('tariffs').select('vehicle_type_id,days,price_eur').order('days')]);
+  vehicleTypes=vt.data||[];spots=sp.data||[];tariffs=tr.data||[];
+  mType.innerHTML=vehicleTypes.map(v=>'<option value="'+v.id+'">'+esc(v.name)+'</option>').join('');
+  rotTariff.innerHTML=vehicleTypes.map(v=>'<option value="'+v.id+'">'+esc(v.name)+' · SIN TARIFA HORARIA</option>').join('');
+  mDays.innerHTML=Array.from({length:24},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+' '+(i?'días':'día')+'</option>').join('');
+  const d=new Date(Date.now()+3600000);mEntry.value=localInput(d);configureManualDatePolicy();updateManualPaymentHint();planDate.value=localInput(new Date()).slice(0,10);
+  renderShiftState();await refreshAll();showArea('stays')
+}
 async function loadShiftState(){const r=await db.rpc('get_current_staff_shift');if(r.error)return;currentShift=r.data?.open?r.data:null;renderShiftState()}
 function shiftDateText(v){if(!v)return '';const d=new Date(v+'T12:00:00');return d.toLocaleDateString('es-ES')}
-function renderShiftState(){if(!currentShift)return;shiftState.textContent='TURNO ABIERTO DE: '+String(currentShift.employee_name||currentProfile?.full_name||'').toUpperCase();shiftMeta.textContent='Turno '+currentShift.shift_code+' · '+shiftDateText(currentShift.shift_date)+' · desde '+fmt(currentShift.opened_at);shiftActionBtn.textContent='Cerrar turno';shiftActionBtn.className='btn red';shiftActivityBtn.classList.remove('hidden')}
+function renderShiftState(){
+  const old=document.getElementById('startShiftBtn');if(old)old.remove();
+  if(currentAccessMode==='free'){
+    shiftState.textContent='ACCESO LIBRE · '+String(currentProfile?.full_name||'').toUpperCase();
+    shiftMeta.textContent=currentProfile?.role==='admin'?'Administrador · acceso libre sin turno':'Gerente · acceso libre sin turno';
+    shiftActivityBtn.classList.add('hidden');
+    if(currentProfile?.role==='manager'){const b=document.createElement('button');b.id='startShiftBtn';b.className='btn green';b.textContent='Realizar turno';b.onclick=startManagerShiftFromFree;shiftActionBtn.parentElement.insertBefore(b,shiftActionBtn)}
+    shiftActionBtn.textContent='Cerrar sesión';shiftActionBtn.className='btn light';shiftActionBtn.onclick=logout;return
+  }
+  if(!currentShift)return;
+  shiftState.textContent='TURNO ABIERTO DE: '+String(currentShift.employee_name||currentProfile?.full_name||'').toUpperCase();
+  shiftMeta.textContent='Turno '+currentShift.shift_code+' · '+shiftDateText(currentShift.shift_date)+' · desde '+fmt(currentShift.opened_at);
+  shiftActionBtn.textContent='Cerrar turno';shiftActionBtn.className='btn red';shiftActionBtn.onclick=closeShiftAndLogout;shiftActivityBtn.classList.remove('hidden')
+}
 async function viewShiftActivity(){if(!currentShift)return;historyTitle.textContent='Actividad · Turno '+currentShift.shift_number;historyBody.innerHTML='<div class="msg">Cargando actividad…</div>';historyModal.classList.remove('hidden');const r=await db.from('staff_activity_log').select('id,action,entity_type,details,created_at').eq('shift_id',currentShift.id).order('created_at',{ascending:false}).limit(200);if(r.error){historyBody.innerHTML='<div class="msg error">'+esc(r.error.message)+'</div>';return}const labels={shift_opened:'APERTURA TURNO',shift_closed:'CIERRE TURNO',reservation_created:'RESERVA CREADA',reservation_updated:'RESERVA MODIFICADA',parking_check_in:'ENTRADA VEHÍCULO',parking_check_out:'SALIDA VEHÍCULO',parking_spot_changed:'CAMBIO DE PLAZA',spot_block_created:'BLOQUEO PLAZA',spot_block_removed:'DESBLOQUEO PLAZA',spot_block_updated:'CAMBIO BLOQUEO'};historyBody.innerHTML=(r.data||[]).map(x=>'<div class="eventRow"><div class="eventType move">'+esc(labels[x.action]||x.action)+'</div><div><b>'+fmt(x.created_at)+'</b><br><small>'+esc(activityDetail(x))+'</small></div></div>').join('')||'<div class="muted">Todavía no hay actividad registrada en este turno.</div>'}
 function activityDetail(x){const d=x.details||{};if(d.reference)return [d.reference,d.plate,d.status,d.amount_eur!=null?money(d.amount_eur):''].filter(Boolean).join(' · ');if(d.event_at)return 'Movimiento registrado · '+fmt(d.event_at);if(d.spot_id)return 'Operación sobre plaza';if(d.shift_number)return 'Turno nº '+d.shift_number;return x.entity_type||''}
 function toggleRotationKey(){rotKeyNumber.disabled=!rotLeavesKeys.checked;if(!rotLeavesKeys.checked)rotKeyNumber.value=''}
 function initRotation(){if(!rotTariff.options.length)rotTariff.innerHTML=vehicleTypes.map(v=>'<option value="'+v.id+'">'+esc(v.name)+' · SIN TARIFA HORARIA</option>').join('')}
 function rotationPending(){alert('Rotación está preparada visualmente. Falta configurar las plazas, las tarifas por horas y el ticket para activar esta operación.')}
+const operationalActions=['createManualReservation','confirmReservation','editVehicleData','modifyReservation','checkIn','chooseNewSpot','checkOut','reenterReserved','regularizePayment','addQuickBlock','toggleSpotBlock','removeQuickBlock','changeSpot','rotationPending'];
+document.addEventListener('click',function(ev){
+  if(currentAccessMode!=='free')return;
+  const btn=ev.target.closest('button[onclick]');if(!btn)return;
+  const code=btn.getAttribute('onclick')||'';
+  if(operationalActions.some(fn=>code.includes(fn+'('))){ev.preventDefault();ev.stopImmediatePropagation();alert('Acceso libre: modo de consulta. Para realizar operaciones debes entrar en turno.')}} ,true);
 function configureManualDatePolicy(){const el=document.getElementById('manualDatePolicy');const input=document.getElementById('mEntry');if(!el||!input)return;input.removeAttribute('min');el.textContent='Todos los usuarios del backoffice pueden crear reservas con fechas pasadas, actuales o futuras.'}
 function ensurePlanningRefresh(){if(planningRefreshTimer)return;planningRefreshTimer=setInterval(async()=>{const active=document.querySelector('#staysNav button.active')?.dataset.tab;if(active==='planning'){await loadReservations();await loadPlanning()}},60000)}
 async function refreshAll(){ensurePlanningRefresh();await loadCapacityBlocks();await Promise.all([loadReservations(),loadInside()]);await loadOutside();await Promise.all([loadDashboard(),loadPlanning(),loadSpots()])}
