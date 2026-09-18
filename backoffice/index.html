@@ -141,10 +141,10 @@ function initRotation(){if(!rotTariff.options.length)rotTariff.innerHTML=rotatio
 function rotationPending(){alert('Rotación está preparada visualmente. Falta configurar las plazas, las tarifas por horas y el ticket para activar esta operación.')}
 const operationalActions=['createManualReservation','confirmReservation','editVehicleData','modifyReservation','checkIn','chooseNewSpot','checkOut','reenterReserved','regularizePayment','addQuickBlock','toggleSpotBlock','removeQuickBlock','changeSpot','rotationPending'];
 document.addEventListener('click',function(ev){
-  if(currentAccessMode!=='free')return;
+  if(currentAccessMode!=='free'||currentProfile?.role==='admin')return;
   const btn=ev.target.closest('button[onclick]');if(!btn)return;
   const code=btn.getAttribute('onclick')||'';
-  if(operationalActions.some(fn=>code.includes(fn+'('))){ev.preventDefault();ev.stopImmediatePropagation();alert('Acceso libre: modo de consulta. Para realizar operaciones debes entrar en turno.')}} ,true);
+  if(operationalActions.some(fn=>code.includes(fn+'('))){ev.preventDefault();ev.stopImmediatePropagation();alert('Acceso libre de gerente: modo de consulta. Para realizar operaciones debes entrar en turno.')}} ,true);
 function configureManualDatePolicy(){const el=document.getElementById('manualDatePolicy');const input=document.getElementById('mEntry');if(!el||!input)return;input.removeAttribute('min');el.textContent='Todos los usuarios del backoffice pueden crear reservas con fechas pasadas, actuales o futuras.'}
 function ensurePlanningRefresh(){if(planningRefreshTimer)return;planningRefreshTimer=setInterval(async()=>{const active=document.querySelector('#staysNav button.active')?.dataset.tab;if(active==='planning'){await loadReservations();await loadPlanning()}},60000)}
 async function refreshAll(){ensurePlanningRefresh();await loadCapacityBlocks();await Promise.all([loadReservations(),loadInside()]);await loadOutside();await Promise.all([loadDashboard(),loadPlanning(),loadSpots()])}
