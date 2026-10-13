@@ -215,7 +215,7 @@ async function connectParkingQz(){
  if(!window.qz?.websocket||!window.qz?.printers)throw new Error('La biblioteca QZ no se ha cargado en Chrome. Comprueba la conexión a Internet y recarga.');
  if(qz.websocket.isActive())return;
  parkingQzStage='Conectando con QZ Tray';
- try{await qz.websocket.connect({host:'localhost',usingSecure:true,retries:2,delay:1})}
+ try{await qz.websocket.connect({host:['localhost','localhost.qz.io'],port:{secure:[8181,8282,8383,8484]},usingSecure:true,retries:1,delay:1})}
  catch(e){throw new Error('No se pudo conectar con QZ Tray desde el backoffice: '+(e.message||e)+'. Revisa si Chrome pide permiso para acceder a dispositivos de la red local.')}
 }
 async function sendParkingPrint(kind,html){
