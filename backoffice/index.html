@@ -218,10 +218,10 @@ async function loadRotationReport(){
  const from=privileged?(document.getElementById('rotationDateFrom')?.value||today):today,to=privileged?(document.getElementById('rotationDateTo')?.value||today):today;
  if(from>to)return alert('Fechas no válidas');
  const end=new Date(to+'T00:00:00');end.setDate(end.getDate()+1);
- const r=await db.from('rotation_sessions').select('ticket_number,plate,client_text,entry_at,exit_at,status,amount_eur,payment_method,entry_shift_id,entry_user_id,rotation_tariffs(name)').gte('entry_at',new Date(from+'T00:00:00').toISOString()).lt('entry_at',end.toISOString()).order('entry_at',{ascending:false}).limit(5000);
+ const first=new Date(from+'T00:00:00').toISOString(),last=end.toISOString();let query=db.from('rotation_sessions').select('ticket_number,plate,client_text,entry_at,exit_at,status,amount_eur,payment_method,entry_shift_id,exit_shift_id,entry_user_id,exit_user_id,rotation_tariffs(name)').order('entry_at',{ascending:false}).limit(5000);if(privileged)query=query.or('and(entry_at.gte.'+first+',entry_at.lt.'+last+'),and(exit_at.gte.'+first+',exit_at.lt.'+last+')');else if(currentShift)query=query.or('entry_shift_id.eq.'+currentShift.id+',exit_shift_id.eq.'+currentShift.id);else query=query.gte('entry_at',first).lt('entry_at',last);const r=await query;
  if(r.error)return alert(r.error.message);
  let rows=r.data||[];
- if(!privileged)rows=rows.filter(x=>currentShift?x.entry_shift_id===currentShift.id:x.entry_user_id===currentSession?.user?.id);
+ if(!privileged)rows=rows.filter(x=>currentShift?(x.entry_shift_id===currentShift.id||x.exit_shift_id===currentShift.id):(x.entry_user_id===currentSession?.user?.id||x.exit_user_id===currentSession?.user?.id));
  const payment=document.getElementById('rotationPayFilter')?.value,min=document.getElementById('rotationMinAmount')?.value,max=document.getElementById('rotationMaxAmount')?.value,weekday=document.getElementById('rotationWeekday')?.value;
  rows=rows.filter(x=>(!payment||x.payment_method===payment)&&(!min||Number(x.amount_eur||0)>=Number(min))&&(!max||Number(x.amount_eur||0)<=Number(max))&&(weekday===''||new Date(x.entry_at).getDay()===Number(weekday)));
  rotationReportRows=rows;const el=document.getElementById('rotationReportResults');if(!el)return;
