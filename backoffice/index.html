@@ -226,7 +226,7 @@ async function sendParkingPrint(kind,html){
  try{found=await qz.printers.find(target)}catch(e){throw new Error('QZ conecta, pero no permite consultar la impresora '+target+': '+(e.message||e))}
  if(!found||!(Array.isArray(found)?found.includes(target):String(found)===target))throw new Error('QZ conecta, pero no encuentra la cola '+target);
  parkingQzStage='Enviando a '+target;
- try{await qz.print(qz.configs.create(target,kind==='stay'?{copies:1,color:false,size:{width:210,height:297},units:'mm',orientation:'portrait'}:{copies:1,color:false}),[{type:'pixel',format:'html',flavor:'plain',data:html}])}
+ try{await qz.print(qz.configs.create(target,kind==='stay'?{copies:1,color:false,size:{width:210,height:100},units:'mm',orientation:'landscape'}:{copies:1,color:false}),[{type:'pixel',format:'html',flavor:'plain',data:html}])}
  catch(e){throw new Error('QZ conecta y encuentra '+target+', pero falla el envío: '+(e.message||e))}
  parkingQzStage='Documento enviado a '+target;
  return true;
