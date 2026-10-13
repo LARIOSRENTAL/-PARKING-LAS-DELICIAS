@@ -226,7 +226,11 @@ async function sendParkingPrint(kind,html){
  try{found=await qz.printers.find(target)}catch(e){throw new Error('QZ conecta, pero no permite consultar la impresora '+target+': '+(e.message||e))}
  if(!found||!(Array.isArray(found)?found.includes(target):String(found)===target))throw new Error('QZ conecta, pero no encuentra la cola '+target);
  parkingQzStage='Enviando a '+target;
- try{await qz.print(qz.configs.create(target,kind==='stay'?{copies:1,color:false,size:{width:210,height:100},units:'mm',orientation:'landscape'}:{copies:1,color:false}),[{type:'pixel',format:'html',flavor:'plain',data:html}])}
+ try{
+  const jobHtml=kind==='stay'?html.replace('</head>','<style media="print">@page{size:210mm 100mm!important;margin:0!important}html,body{width:210mm!important;height:100mm!important;margin:0!important;overflow:hidden!important}.ticket{position:absolute!important;left:175mm!important;top:5mm!important;margin:0!important;transform-origin:top left!important;transform:rotate(90deg)!important;break-inside:avoid!important}.actions{display:none!important}</style></head>'):html;
+  const cfg=kind==='stay'?{copies:1,color:false,size:{width:210,height:100},units:'mm',orientation:'landscape',margins:0}:{copies:1,color:false};
+  await qz.print(qz.configs.create(target,cfg),[{type:'pixel',format:'html',flavor:'plain',data:jobHtml}])
+ }
  catch(e){throw new Error('QZ conecta y encuentra '+target+', pero falla el envío: '+(e.message||e))}
  parkingQzStage='Documento enviado a '+target;
  return true;
