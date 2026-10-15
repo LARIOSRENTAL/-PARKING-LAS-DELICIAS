@@ -17,3 +17,7 @@ Comprobación realizada adicionalmente en Chromium con backend simulado: lectura
 Las pruebas de lista negra comprueban normalización, bloqueo real de entradas en Rotación y Estancias, retirada de bloqueo, salida de un coche ya dentro, mensajes con la observación y alta desde el formulario.
 
 `individual-vouchers.cjs` verifica además numeración H/E, migración sin variación de saldos, titularidad, códigos duplicados/inexistentes/usados, cantidad exacta por estancia, ampliaciones, conversión desde Rotación, reimpresión estable y rechazo de pagos sin códigos individuales.
+
+`bank-invoice-mail.cjs` usa dobles locales de pg_net/pg_cron y verifica pago sin duplicados, factura y cola únicas, actualización de email pendiente, exclusión de clientes no habilitados y pruebas sin cobro real. Se ha comprobado además un PDF sintético de una página, con el PNG original y sin el recibo interno. No se envían facturas reales para ejecutar las pruebas.
+
+`rotation-enter-ui.cjs` comprueba las dos acciones de Intro, conservación del formulario, fallo de consulta, protección ante doble pulsación y presencia de la leyenda completa. Las pruebas de banco comprueban además que Banco se conserva aunque se solicite tarjeta o se edite el método habitual.

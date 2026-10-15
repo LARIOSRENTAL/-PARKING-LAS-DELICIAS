@@ -27,3 +27,19 @@ Al seleccionar «Bonos hotel», sitúa el cursor en el campo de códigos y escan
 El canje registra los códigos concretos y descuenta los días del hotel en una sola transacción. Ampliar una estancia exige los bonos de los días adicionales. «Mandar a estancia» desde Rotación pide también los códigos y conserva la entrada original. Las pantallas antiguas no pueden seguir canjeando únicamente por nombre de hotel.
 
 Las compras anteriores se numeran individualmente respetando los saldos y canjes existentes. Sus bonos pendientes deben reimprimirse con «Reimprimir disponibles» para obtener los códigos H individuales; las hojas antiguas compartían el número de compra. Reimprimir conserva los registros H y excluye los ya canjeados. Una reimpresión no crea una compra ni suma caja.
+
+## Prueba del lector y correo de abonados por banco
+
+Las compras de prueba se marcan `is_test`: sirven para validar la impresión y el canje, pero no crean un cobro de caja. Las compras de prueba retiradas se marcan `is_void`; no aparecen como disponibles, no se imprimen ni se canjean, y sus códigos no se reutilizan.
+
+Para probar el lector: abre Bloc de notas y escanea un bono nuevo. Si escribe, por ejemplo, H-21 y termina con Intro, funciona como teclado USB. Después, en Nueva estancia → Bonos hotel, sitúa el cursor en el campo de códigos y escanea tantos bonos como días. Debe aparecer PRUEBAS LECTOR CÓDIGOS y descontarse únicamente los códigos utilizados al confirmar la estancia.
+
+Los abonados habilitados con `auto_email_bank` generan una única factura y una tarea de correo al marcar el mes como pagado por banco. No se envían facturas antiguas solo por habilitar el flag. Los destinatarios se leen de la ficha del abonado; el navegador no proporciona una dirección arbitraria. Marcar el mismo mes dos veces no duplica el envío. El proceso se ejecuta en servidor y continúa aunque se cierre el navegador.
+
+La función `bank-invoice-mail` genera el PDF A4 con el PNG original y exclusivamente la copia del cliente. Requiere `RESEND_API_KEY` y un remitente de dominio verificado en `INVOICE_EMAIL_FROM` (o `BOOKING_EMAIL_FROM`); `INVOICE_EMAIL_REPLY_TO` es opcional. Las direcciones personales de Gmail se pueden usar como Reply-To, pero no como dominio de envío de Resend. La opción «Comprobar correo de facturas» muestra el estado real de configuración. Las facturas sin email o sin datos fiscales quedan pendientes; completar la ficha desbloquea esos trabajos. El error de correo nunca debe cancelar el registro del pago.
+
+La cola tiene RLS, funciones internas exclusivas del rol de servicio, autenticación del empleado o del trabajador interno y reintentos limitados. Resend recibe una clave de idempotencia fija por trabajo. Los trabajos ya enviados no se vuelven a despachar y las situaciones antiguas ambiguas requieren revisión antes de reintentar.
+
+Los abonados del listado de banco mantienen Banco fijado en la tabla, la edición de ficha y los cobros en grupo. Dos disparadores lo garantizan también en base de datos antes de registrar caja o correo. No se reescriben cobros históricos.
+
+En Rotación, Intro consulta primero la matrícula: si está dentro abre el cobro; si no está dentro registra e imprime la entrada. Conserva tarifa y datos de llaves elegidos. Los errores de consulta no se interpretan como matrícula nueva y el bloqueo de lista negra sigue activo. La leyenda de retirada, extravío y tarifa del ticket se reproduce completa.
