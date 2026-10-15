@@ -21,3 +21,5 @@ Las pruebas de lista negra comprueban normalización, bloqueo real de entradas e
 `bank-invoice-mail.cjs` usa dobles locales de pg_net/pg_cron y verifica pago sin duplicados, factura y cola únicas, actualización de email pendiente, exclusión de clientes no habilitados y pruebas sin cobro real. Se ha comprobado además un PDF sintético de una página, con el PNG original y sin el recibo interno. No se envían facturas reales para ejecutar las pruebas.
 
 `rotation-enter-ui.cjs` comprueba las dos acciones de Intro, conservación del formulario, fallo de consulta, protección ante doble pulsación y presencia de la leyenda completa. Las pruebas de banco comprueban además que Banco se conserva aunque se solicite tarjeta o se edite el método habitual.
+
+`free-hours-ui.cjs` ejecuta las funciones reales de la ventana de cobro contra el calculador PostgreSQL aislado: 3 horas con 1 o 2 bonos, restablecer cero, exceso de horas gratuitas, descuento adicional, orden de respuestas y error de cálculo.

@@ -43,3 +43,5 @@ La cola tiene RLS, funciones internas exclusivas del rol de servicio, autenticac
 Los abonados del listado de banco mantienen Banco fijado en la tabla, la edición de ficha y los cobros en grupo. Dos disparadores lo garantizan también en base de datos antes de registrar caja o correo. No se reescriben cobros históricos.
 
 En Rotación, Intro consulta primero la matrícula: si está dentro abre el cobro; si no está dentro registra e imprime la entrada. Conserva tarifa y datos de llaves elegidos. Los errores de consulta no se interpretan como matrícula nueva y el bloqueo de lista negra sigue activo. La leyenda de retirada, extravío y tarifa del ticket se reproduce completa.
+
+En el cobro de Rotación, «Bonos hora gratis» resta las horas indicadas a la duración original y vuelve a consultar la tarifa completa para la duración restante (no aplica una regla de tres sobre el importe). «Precio» muestra ese importe recalculado y «Descuento (€)» conserva una rebaja adicional independiente. «Precio total» permanece editable y queda debajo de los bonos. Se espera al cálculo antes de permitir el cobro y se descartan respuestas antiguas si cambian los bonos rápidamente.
