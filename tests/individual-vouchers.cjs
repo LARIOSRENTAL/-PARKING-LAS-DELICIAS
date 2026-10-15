@@ -1,0 +1,26 @@
+module.exports=async({db,q,scalar,root,assert,type,hotel})=>{
+ const fs=require('fs'),path=require('path');
+ await db.exec('alter table public.parking_hotel_redemptions add primary key(reservation_id)');
+ await db.exec(fs.readFileSync(path.join(root,'tests/fixtures/extend-hotel-paid.sql'),'utf8'));
+ const balanceBefore=Number(await scalar('select available_days from parking_hotel_balances where id=$1',[hotel]));
+ await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261015104534_individual_hotel_vouchers.sql'),'utf8'));
+ assert.equal(Number(await scalar('select available_days from parking_hotel_balances where id=$1',[hotel])),balanceBefore);
+ assert.equal(await scalar('select min(number)::int from parking_hotel_vouchers'),1);
+ const codes=async(h,n)=>(await q('select v.code from parking_hotel_vouchers v join parking_hotel_batches b on b.id=v.batch_id where b.hotel_id=$1 and v.redeemed_reservation_id is null order by v.number limit $2',[h,n])).rows.map(x=>x.code);
+ const selected=await codes(hotel,2);const resolved=await scalar('select parking_resolve_hotel_vouchers($1)',[selected]);assert.equal(resolved.hotel_id,hotel);assert.equal(resolved.days,2);
+ await assert.rejects(()=>scalar('select parking_resolve_hotel_vouchers($1)',[[selected[0],selected[0]]]),/repetidos/);
+ await assert.rejects(()=>scalar('select parking_resolve_hotel_vouchers($1)',[['H-999999999']]),/no existe/);
+ await assert.rejects(()=>scalar("select parking_create_stay_from_vouchers($1,$2,clock_timestamp(),1,'6666ABC','KIA')",[selected,type]),/un bono por cada día/);
+ const stay=await scalar("select parking_create_stay_from_vouchers($1,$2,clock_timestamp(),2,'6666ABC','KIA')",[selected,type]);assert.equal(stay.reference,'E-1');assert.deepEqual(stay.voucher_codes,selected);
+ assert.equal(Number(await scalar('select available_days from parking_hotel_balances where id=$1',[hotel])),balanceBefore-2);
+ const resCount=await scalar('select count(*)::int from reservations');await assert.rejects(()=>scalar("select parking_create_stay_from_vouchers($1,$2,clock_timestamp(),2,'7777ABC','FORD')",[selected,type]),/ya está utilizado/);assert.equal(await scalar('select count(*)::int from reservations'),resCount);
+ await assert.rejects(()=>scalar("insert into reservations(vehicle_type_id,entry_at,duration_days,plate,vehicle_make_model,payment_method,payment_status,hotel_id)values($1,clock_timestamp(),1,'8888ABC','BMW','hotel_voucher','paid',$2)returning id",[type,hotel]),/bono individual válido/);
+ const cash=await scalar("insert into reservations(vehicle_type_id,entry_at,duration_days,plate,vehicle_make_model,payment_method,payment_status)values($1,clock_timestamp(),1,'5555ABC','BMW','cash','unpaid')returning reference",[type]);assert.equal(cash,'E-2');
+ const extra=await codes(hotel,1);await scalar('select parking_extend_stay_from_vouchers($1,3,$2)',[stay.id,extra]);assert.equal(await scalar('select count(*)::int from parking_hotel_vouchers where redeemed_reservation_id=$1',[stay.id]),3);
+ const hotel2=await scalar("insert into parking_hotels(name)values('HOTEL SEGUNDO TEST')returning id"),batch=await scalar('select create_parking_hotel_batch($1,10)',[hotel2]),other=await codes(hotel2,1),own=await codes(hotel,1);await assert.rejects(()=>scalar('select parking_resolve_hotel_vouchers($1)',[[...own,...other]]),/mismo hotel/);
+ const batch1=await scalar('select parking_hotel_batch_vouchers($1)',[batch.id]),batch2=await scalar('select parking_hotel_batch_vouchers($1)',[batch.id]);assert.equal(batch1.vouchers.length,10);assert.equal(new Set(batch1.vouchers.map(v=>v.code)).size,10);assert.deepEqual(batch1,batch2);
+ await assert.rejects(()=>scalar("select create_hotel_paid_reservation($1,$2,clock_timestamp(),1,'8888ABC','KIA')",[hotel,type]),/escanear/);
+ const rotation=await scalar("select rotation_check_in('TURISMO','9999ABC')"),spot=await scalar("insert into parking_spots(code,vehicle_type_id)values('T-INDIVIDUAL',$1)returning id",[type]),entry=await scalar('select entry_at from rotation_sessions where id=$1',[rotation.id]),transferCodes=await codes(hotel,1);
+ const transfer=await scalar("select parking_rotation_to_stay_with_vouchers($1,$2,$3,1,'SEAT',$4)",[rotation.id,type,spot,transferCodes]);assert.equal(transfer.reference,'E-3');assert.equal(new Date(await scalar('select actual_entry_at from parking_sessions where reservation_id=$1',[transfer.id])).toISOString(),new Date(entry).toISOString());
+ console.log('Bonos: saldo histórico conservado; H y E correlativos; titular automático; repetidos/inexistentes/usados rechazados; ampliación, conversión, integridad y reimpresión estable verificadas.');
+};

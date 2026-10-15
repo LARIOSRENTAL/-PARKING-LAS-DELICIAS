@@ -17,3 +17,13 @@ Los recibos usan una serie separada `PLDFS-año-correlativo`, base e IVA del 21 
 La pestaña «Lista negra» permite incorporar matrículas y una observación obligatoria, editar el motivo y retirar o reactivar el bloqueo. Los empleados necesitan un turno abierto para modificarla; el administrador conserva el acceso operativo existente. Las matrículas se comparan sin espacios ni guiones.
 
 Al introducir una matrícula bloqueada se muestra el motivo y un aviso para no emitir ticket. La base de datos impide una nueva entrada tanto en Rotación como en Estancias, incluso desde una pantalla desactualizada. Un vehículo que ya estaba dentro puede salir y pagar normalmente. Retirar un bloqueo conserva el registro y sus fechas de auditoría.
+
+## Bonos individuales H y registros E
+
+Cada bono hotel representa un día y tiene un registro global único H-1, H-2… con código Code 128. Los registros de nuevas estancias usan E-1, E-2…; las referencias históricas se conservan.
+
+Al seleccionar «Bonos hotel», sitúa el cursor en el campo de códigos y escanea los bonos con el lector (terminador Intro), o escribe sus registros separados por comas, espacios o saltos de línea. El hotel propietario aparece automáticamente. Debe haber un bono por día y todos deben ser del mismo hotel. Se rechazan registros inexistentes, repetidos, ya utilizados o pertenecientes a un hotel desactivado.
+
+El canje registra los códigos concretos y descuenta los días del hotel en una sola transacción. Ampliar una estancia exige los bonos de los días adicionales. «Mandar a estancia» desde Rotación pide también los códigos y conserva la entrada original. Las pantallas antiguas no pueden seguir canjeando únicamente por nombre de hotel.
+
+Las compras anteriores se numeran individualmente respetando los saldos y canjes existentes. Sus bonos pendientes deben reimprimirse con «Reimprimir disponibles» para obtener los códigos H individuales; las hojas antiguas compartían el número de compra. Reimprimir conserva los registros H y excluye los ya canjeados. Una reimpresión no crea una compra ni suma caja.

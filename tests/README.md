@@ -15,3 +15,5 @@ Verifica cálculo de rotación, lectura normalizada de matrícula, total editabl
 Comprobación realizada adicionalmente en Chromium con backend simulado: lectura USB por teclado y Enter, apertura automática de cobro, selección de tarjeta y casilla de ticket, formulario único de factura y renderización de ambos tickets en papel de 80 mm.
 
 Las pruebas de lista negra comprueban normalización, bloqueo real de entradas en Rotación y Estancias, retirada de bloqueo, salida de un coche ya dentro, mensajes con la observación y alta desde el formulario.
+
+`individual-vouchers.cjs` verifica además numeración H/E, migración sin variación de saldos, titularidad, códigos duplicados/inexistentes/usados, cantidad exacta por estancia, ampliaciones, conversión desde Rotación, reimpresión estable y rechazo de pagos sin códigos individuales.
