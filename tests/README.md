@@ -23,3 +23,7 @@ Las pruebas de lista negra comprueban normalización, bloqueo real de entradas e
 `rotation-enter-ui.cjs` comprueba las dos acciones de Intro, conservación del formulario, fallo de consulta, protección ante doble pulsación y presencia de la leyenda completa. Las pruebas de banco comprueban además que Banco se conserva aunque se solicite tarjeta o se edite el método habitual.
 
 `free-hours-ui.cjs` ejecuta las funciones reales de la ventana de cobro contra el calculador PostgreSQL aislado: 3 horas con 1 o 2 bonos, restablecer cero, exceso de horas gratuitas, descuento adicional, orden de respuestas y error de cálculo.
+
+`inventory-rates.cjs` verifica el inventario exacto (218 plazas enumeradas y 30 de reserva), restricciones FIJO/OCUPADO, plazas polivalentes, reentrada de empleado con auditoría de movimientos bigint, límites de fechas en hora de Málaga, conservación del precio al cambiar estados, rechazo de periodos solapados, Rotación atravesando periodos y permisos reales de PostgreSQL para gerente y empleado. `inventory-rates-ui.cjs` comprueba el único planning, sus filtros, exclusión de plazas fijas/bloqueadas, campos de tarifas por fechas y bloqueo de navegación para empleados.
+
+Los códigos antiguos con asignaciones se conservan como pendientes de ubicar, sin inventar equivalencias con los nombres nuevos. El listado recibido suma 218 plazas numeradas, aunque su resumen indicaba 215.

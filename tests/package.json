@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "node operations-db.cjs && node blacklist-ui.cjs && node rotation-enter-ui.cjs"
+    "test": "node operations-db.cjs && node blacklist-ui.cjs && node rotation-enter-ui.cjs && node inventory-rates.cjs && node inventory-rates-ui.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10"

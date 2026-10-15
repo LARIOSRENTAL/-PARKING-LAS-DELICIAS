@@ -1,0 +1,1490 @@
+[
+  {
+    "code": "J-1",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-2",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "blocked"
+  },
+  {
+    "code": "J-3",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "blocked"
+  },
+  {
+    "code": "J-4",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "blocked"
+  },
+  {
+    "code": "J-5",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-6",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-7",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-8",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-9",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-10",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-11",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-12",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-13",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-14",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-15",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-16",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-17",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-18",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-19",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-20",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-21",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-22",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-23",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-24",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-25",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-26",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-27",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "blocked"
+  },
+  {
+    "code": "J-28",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "blocked"
+  },
+  {
+    "code": "J-29",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-30",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-31",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-32",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-33",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-34",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-35",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-36",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-37",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-38",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "blocked"
+  },
+  {
+    "code": "J-39",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-40",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-41",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-42",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-43",
+    "zone": "J",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-44",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-45",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "blocked"
+  },
+  {
+    "code": "J-46",
+    "zone": "J",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-47",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-48",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-49",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-50",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-51",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-52",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-53",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-54",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-55",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-56",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-57",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-58",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-59",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-60",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "J-61",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "J-62",
+    "zone": "J",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-3",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-4",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-5",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-6",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-7",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-8",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-9",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-10",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-11",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-12",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-13",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-14",
+    "zone": "B",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-15",
+    "zone": "B",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-16",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-17",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-18",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-19",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-20",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-21",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-22",
+    "zone": "B",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-23",
+    "zone": "B",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-24",
+    "zone": "B",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-25",
+    "zone": "B",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-26",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-27",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-28",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-29",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-30",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-31",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-32",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-33",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-34",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-35",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-36",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "B-37",
+    "zone": "B",
+    "spot_class": "XXL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-38",
+    "zone": "B",
+    "spot_class": "XXL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-39",
+    "zone": "B",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-40",
+    "zone": "B",
+    "spot_class": "XXL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-41",
+    "zone": "B",
+    "spot_class": "XXL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-42",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-43",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "B-44",
+    "zone": "B",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-2",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "C-3",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-4",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-5",
+    "zone": "C",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "C-6",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-7",
+    "zone": "C",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "C-8",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-9",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-10",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "blocked"
+  },
+  {
+    "code": "C-11",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-12",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-13",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-14",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-15",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-16",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-17",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-18",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-19",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-20",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-21",
+    "zone": "C",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "C-22",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-23",
+    "zone": "C",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "C-24",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-25",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-26",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-27",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "C-28",
+    "zone": "C",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "P-1",
+    "zone": "P",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "P-2",
+    "zone": "P",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "P-3",
+    "zone": "P",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "P-4",
+    "zone": "P",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "P-5",
+    "zone": "P",
+    "spot_class": "XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "P-6",
+    "zone": "P",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "P-7",
+    "zone": "P",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "P-8",
+    "zone": "P",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "P-9",
+    "zone": "P",
+    "spot_class": "PEQUEÑO-XL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "P-10",
+    "zone": "P",
+    "spot_class": "XL",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "P-11",
+    "zone": "P",
+    "spot_class": "XXL",
+    "inventory_state": "available"
+  },
+  {
+    "code": "M-1",
+    "zone": "M",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "M-2",
+    "zone": "M",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "M-3",
+    "zone": "M",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "M-4",
+    "zone": "M",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "M-5",
+    "zone": "M",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "M-6",
+    "zone": "M",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "M-7",
+    "zone": "M",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "M-8",
+    "zone": "M",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-1",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "A-2",
+    "zone": "A",
+    "spot_class": "PEQUEÑO",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-3",
+    "zone": "A",
+    "spot_class": "PEQUEÑO",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-4",
+    "zone": "A",
+    "spot_class": "PEQUEÑO",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-5",
+    "zone": "A",
+    "spot_class": "PEQUEÑO",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-6",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-7",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-8",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-9",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-10",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-11",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-12",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-13",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-14",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-15",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-16",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-17",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-18",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-19",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-20",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-21",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-22",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-23",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-24",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-25",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-26",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-27",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-28",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-29",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-30",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-31",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-32",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-33",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-34",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-35",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-36",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "A-37",
+    "zone": "A",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-4",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-5",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-6",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-39",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-40",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-41",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-42",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-44",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-45",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-46",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-47",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-71",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-72",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-73",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-74",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-75",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-76",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-77",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-90",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-91",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-92",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-93",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-94",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-103",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-104",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "LL-105",
+    "zone": "LL",
+    "spot_class": "ESTÁNDAR",
+    "inventory_state": "available"
+  },
+  {
+    "code": "MOTO 1",
+    "zone": "MOTO",
+    "spot_class": "MOTO",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "MOTO 2",
+    "zone": "MOTO",
+    "spot_class": "MOTO",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "MOTO 3",
+    "zone": "MOTO",
+    "spot_class": "MOTO",
+    "inventory_state": "fixed"
+  },
+  {
+    "code": "MOTO 4",
+    "zone": "MOTO",
+    "spot_class": "MOTO",
+    "inventory_state": "available"
+  },
+  {
+    "code": "MOTO 5",
+    "zone": "MOTO",
+    "spot_class": "MOTO",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-01",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-02",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-03",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-04",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-05",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-06",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-07",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-08",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-09",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-10",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-11",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-12",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-13",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-14",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-15",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-16",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-17",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-18",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-19",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-20",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-21",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-22",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-23",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-24",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-25",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-26",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-27",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-28",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-29",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  },
+  {
+    "code": "RESERVA-30",
+    "zone": "RESERVA",
+    "spot_class": "POLIVALENTE",
+    "inventory_state": "available"
+  }
+]
