@@ -11,3 +11,9 @@
 Los tickets usan la cola existente `BIXOLON SRP-350III`, en 80 mm. Facturas y caja conservan `FACTURAS`; bonos conservan `RICOH MP 2003`. Las opciones del trabajo no cambian las preferencias ni la impresora predeterminada de Windows. La firma local de QZ se conserva y debe estar configurada en ese ordenador.
 
 Los recibos usan una serie separada `PLDFS-año-correlativo`, base e IVA del 21 % incluidos en el total cobrado. La reimpresión recupera el mismo número y no suma otro movimiento de caja.
+
+## Lista negra
+
+La pestaña «Lista negra» permite incorporar matrículas y una observación obligatoria, editar el motivo y retirar o reactivar el bloqueo. Los empleados necesitan un turno abierto para modificarla; el administrador conserva el acceso operativo existente. Las matrículas se comparan sin espacios ni guiones.
+
+Al introducir una matrícula bloqueada se muestra el motivo y un aviso para no emitir ticket. La base de datos impide una nueva entrada tanto en Rotación como en Estancias, incluso desde una pantalla desactualizada. Un vehículo que ya estaba dentro puede salir y pagar normalmente. Retirar un bloqueo conserva el registro y sus fechas de auditoría.

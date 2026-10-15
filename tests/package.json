@@ -1,1 +1,1 @@
-{"private":true,"scripts":{"test":"node operations-db.cjs"},"devDependencies":{"@electric-sql/pglite":"0.5.10"}}
+{"private": true, "scripts": {"test": "node operations-db.cjs && node blacklist-ui.cjs"}, "devDependencies": {"@electric-sql/pglite": "0.5.10"}}
