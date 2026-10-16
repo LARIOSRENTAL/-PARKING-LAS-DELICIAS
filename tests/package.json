@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "node operations-db.cjs && node blacklist-ui.cjs && node rotation-enter-ui.cjs && node inventory-rates.cjs && node inventory-rates-ui.cjs && node cash-withdrawals-db.cjs && node cash-withdrawals-ui.cjs && node navigation-ui.cjs && node navigation-persistence.cjs && node cashbook-reconciliation-db.cjs && node cashbook-reconciliation-ui.cjs && node subscriber-billing-db.cjs && node public-web-inventory-db.cjs && node billing-exports-ui.cjs"
+    "test": "node operations-db.cjs && node blacklist-ui.cjs && node rotation-enter-ui.cjs && node inventory-rates.cjs && node inventory-rates-ui.cjs && node cash-withdrawals-db.cjs && node cash-withdrawals-ui.cjs && node navigation-ui.cjs && node navigation-persistence.cjs && node cashbook-reconciliation-db.cjs && node persistent-vouchers-db.cjs && node cashbook-reconciliation-ui.cjs && node subscriber-billing-db.cjs && node public-web-inventory-db.cjs && node billing-exports-ui.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10"
