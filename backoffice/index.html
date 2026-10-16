@@ -295,9 +295,9 @@ async function sendParkingPrint(kind,html){
  try{
   const hotelHtml=kind==='stay'&&html.includes('Bonos hotel ');
   const jobHtml=hotelHtml?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;margin:0!important;padding:0!important}.coupon{width:100mm!important;height:210mm!important;break-after:page!important}.coupon:last-child{break-after:auto!important}</style></head>'):kind==='stay'?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;height:210mm!important;margin:0!important;overflow:hidden!important}.ticket{margin:0 auto!important}.actions{display:none!important}</style></head>'):html;
-  const cfg=kind==='ticket'?{copies:1,color:false,size:{width:80,height:200},units:'mm',orientation:'portrait',margins:0}:kind==='stay'?{copies:1,color:false,size:{width:100,height:210},units:'mm',orientation:'portrait',margins:0}:{copies:1,color:false};
-  if(hotelHtml){const pages=hotelCouponPrintPages(jobHtml);let sent=0;try{for(const pageHtml of pages){parkingQzStage='Enviando bono de hotel '+(sent+1)+' de '+pages.length+' a '+target;await qz.print(qz.configs.create(target,cfg),[{type:'pixel',format:'html',flavor:'plain',data:pageHtml}]);sent++}}catch(e){throw new Error('Se han enviado '+sent+' de '+pages.length+' bonos a la cola. No repitas la tanda completa para evitar duplicados. Detalle: '+(e.message||e))}}
-  else await qz.print(qz.configs.create(target,cfg),[{type:'pixel',format:'html',flavor:'plain',data:jobHtml}])
+  const cfg=kind==='ticket'?{copies:1,color:false,size:{width:80,height:200},units:'mm',orientation:'portrait',margins:0}:kind==='stay'?parkingStayPrintConfig():{copies:1,color:false};
+  if(hotelHtml){const pages=hotelCouponPrintPages(jobHtml);let sent=0;try{for(const pageHtml of pages){parkingQzStage='Enviando bono de hotel '+(sent+1)+' de '+pages.length+' a '+target;await qz.print(qz.configs.create(target,parkingStayPrintConfig()),[parkingHtmlPrintData('stay',pageHtml)]);sent++}}catch(e){throw new Error('Se han enviado '+sent+' de '+pages.length+' bonos a la cola. No repitas la tanda completa para evitar duplicados. Detalle: '+(e.message||e))}}
+  else await qz.print(qz.configs.create(target,cfg),[parkingHtmlPrintData(kind,jobHtml)])
  }
  catch(e){throw new Error('QZ conecta y encuentra '+target+', pero falla el envío: '+(e.message||e))}
  parkingQzStage='Documento enviado a '+target;
@@ -568,4 +568,5 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="stay-completion.js?v=manual-finish-20261016"></script>
 <script src="staff-users.js?v=users-20261016"></script>
 <script src="rotation-spots.js?v=real-spots-20261016"></script>
+<script src="print-profiles.js?v=locked-portrait-20261016"></script>
 </body></html>
