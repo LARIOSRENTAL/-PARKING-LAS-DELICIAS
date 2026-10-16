@@ -35,3 +35,11 @@ La captura muestra que el dispositivo declara bandeja 1 como A4 y solicita A5 co
 ## Selector de plazas de Rotación
 
 Se sustituye el datalist nativo por un desplegable propio de plazas disponibles por categoría/grupo y prefijo de código o número. Se puede elegir con ratón o flechas y Enter; la selección no registra una entrada hasta el siguiente Enter. Si se escribe una plaza conocida no disponible, el campo queda rojo, aria-invalid y mensaje «Plaza no disponible». La validación existente del servidor sigue evitando doble ocupación. Se conservan limpieza de matrícula/plaza tras entrada y excepciones de llaves del Salón Alto.
+
+## Alias observado de la Ricoh (16/10, 21:27)
+
+El controlador del puesto devuelve exactamente Automatic-Feeder, top, middle, manual. En la cola RICOH MP 2003 se admite top como la bandeja superior/1 únicamente cuando se publica también middle y no existe ya un nombre explícito de bandeja 1. No se elige Automatic-Feeder, middle ni manual como sustituto. El alias se limita a esta cola; no se modifica el perfil de estancias ni las preferencias de Windows. Las pruebas reproducen esa respuesta real, verifican el trabajo A5 por top y rechazan otras impresoras, ausencia de top, ausencia de middle y top duplicado. Referencia: OpenJDK Win32PrintService dmPaperBinToMediaTray / MediaTray.TOP (bandeja superior). Sigue pendiente confirmar la hoja física en el puesto.
+
+## Tamaño confirmado por el usuario (16/10, 21:30)
+
+El usuario confirma expresamente «A4 horizontal del perfil» tras mostrar HOJA DE CAJA con A4 210×297, horizontal, bandeja 1, papel normal y reciclado. Esto sustituye la petición anterior A5 y las referencias históricas A5 de este documento. El resumen se envía como A4 horizontal (área 285×198 mm, margen 6 mm), con la bandeja 1/top resuelta del controlador. Se conserva el tipo de papel configurado en el controlador; la web no cambia preferencias globales ni intenta activar por nombre un preset Ricoh. El resumen y el cierre usan la misma configuración. Las estancias/hotel 100×210 verticales no cambian.

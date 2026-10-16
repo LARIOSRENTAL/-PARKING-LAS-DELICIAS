@@ -6,15 +6,23 @@ const PARKING_STAY_PRINT_PROFILE=Object.freeze({
  size:Object.freeze({width:100,height:210,custom:true})
 });
 function parkingStayPrintConfig(){return {...PARKING_STAY_PRINT_PROFILE,size:{...PARKING_STAY_PRINT_PROFILE.size}}}
-// HOJA DE CAJA: A5 horizontal, bandeja 1. Options apply only to this job.
+// HOJA DE CAJA: A4 horizontal, bandeja 1. Options apply only to this job.
 function parkingCashbookPrintConfig(tray){if(typeof tray!=='string'||!tray.trim())throw new Error('No se ha identificado la bandeja 1 de la Ricoh.');return {
  copies:1,color:false,units:'mm',orientation:'landscape',rotation:0,
- size:{width:148,height:210},printerTray:tray,jobName:'HOJA DE CAJA · A5 · BANDEJA 1',margins:6,
+ size:{width:210,height:297},printerTray:tray,jobName:'HOJA DE CAJA · A4 · BANDEJA 1',margins:6,
  scaleContent:true,rasterize:true
 }}
 function parkingCashbookTrayName(printer){
  const trays=printer?.trays;if(!Array.isArray(trays))throw new Error('QZ no comunica las bandejas de la Ricoh. No se enviará la caja a una bandeja por defecto.');
  const matches=trays.filter(name=>typeof name==='string'&&/^(?:(?:paper[ _-]*)?(?:tray|bandeja|cassette|cassete|bandeja de papel|gaveta))[ _-]*0?1(?:[ _-]*\([^)]*\))?$/i.test(name.trim()));
+ // Ricoh MP 2003 Windows/Java names observed on this workstation:
+ // DMBIN_UPPER (1) = MediaTray.TOP; DMBIN_MIDDLE (3) = MIDDLE.
+ // Only this queue and the observed top/middle driver family use this alias.
+ if(matches.length===0&&printer?.name==='RICOH MP 2003'){
+  const top=trays.filter(name=>typeof name==='string'&&name.trim().toLowerCase()==='top');
+  const middle=trays.some(name=>typeof name==='string'&&name.trim().toLowerCase()==='middle');
+  if(top.length===1&&middle)return top[0]
+ }
  if(matches.length!==1)throw new Error('No se identifica una única bandeja 1 en la Ricoh. Bandejas comunicadas: '+trays.join(', ')+'. No se ha impreso el resumen.');
  return matches[0]
 }
@@ -26,6 +34,6 @@ async function parkingCashbookPrintConfigForPrinter(target){
 function parkingHtmlPrintData(kind,html){
  const data={type:'pixel',format:'html',flavor:'plain',data:html};
  if(kind==='stay')data.options={pageWidth:100,pageHeight:210};
- if(kind==='cashbook')data.options={pageWidth:198,pageHeight:136};
+ if(kind==='cashbook')data.options={pageWidth:285,pageHeight:198};
  return data;
 }
