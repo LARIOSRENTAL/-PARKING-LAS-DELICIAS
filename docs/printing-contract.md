@@ -9,3 +9,9 @@ La orientación vertical ya figuraba en el código anterior; por tanto no se atr
 La prueba `node tests/print-profiles.cjs`, incluida también en `npm test --prefix tests`, intercepta los trabajos sin imprimir. Comprueba la secuencia factura → bono → ticket → bono, los bonos hotel, la independencia entre objetos de configuración y los errores de cola sin reintento automático. La documentación oficial de QZ describe las opciones de documento en https://qz.io/api/qz.configs y las dimensiones de renderizado HTML en https://qz.io/docs/pixel.
 
 No se crean estancias, cobros ni impresiones reales durante la validación. Para comprobar el equipo debe reimprimirse el bono ya registrado, no crear otra estancia.
+
+## Hoja de caja al cerrar turno
+
+Cerrar turno imprime obligatoriamente una consulta fresca por el UUID del turno propio, incluso para gerente/administrador, sin reutilizar la consulta de pantalla por fecha. Se envía antes del cierre; si falla la consulta o el envío, no se cierra ni se termina la sesión. Se bloquean dobles pulsaciones. La aceptación de QZ significa enviado a la cola, no confirma la salida física del papel.
+
+El trabajo `cashbook` usa exclusivamente RICOH MP 2003, A5 horizontal (perfil HOJA DE CAJA), bandeja 1 (`printerTray:1`), márgenes de 6 mm. El HTML tiene anchura imprimible de 198 mm, sin altura fija, para permitir varias hojas si hay muchos cobros. Estos ajustes son locales al trabajo y nunca modifican las preferencias de Windows, los bonos verticales, las facturas ni los tickets. También se aplican al botón de reimpresión del resumen. La prueba cashbook-close.cjs verifica turno exacto, datos frescos, fallos, cancelación y doble clic, sin cerrar turnos reales.

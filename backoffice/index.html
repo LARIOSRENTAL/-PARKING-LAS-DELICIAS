@@ -110,13 +110,20 @@ async function chooseManagerAccess(mode){
 }
 async function cancelManagerAccess(){managerAccessModal.classList.add('hidden');sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()}
 async function logout(){sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()}
+let closingShift=false;
 async function closeShiftAndLogout(){
+  if(closingShift)return;
   if(currentAccessMode==='free'||!currentShift)return logout();
-  if(!confirm('¿Cerrar el turno '+currentShift.shift_code+' y salir del backoffice?'))return;
-  if(confirm('¿Imprimir la hoja de caja de este turno antes de cerrar?')){cashbookDate.value=currentShift.shift_date;cashbookShift.value=currentShift.shift_code;showArea('cashbook');await loadCashbook();if(!await printCashbook())return}
-  const r=await db.rpc('close_staff_shift');
-  if(r.error)return alert('No se pudo cerrar el turno: '+r.error.message);
-  sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()
+  if(!confirm('¿Cerrar el turno '+currentShift.shift_code+', imprimir su hoja de caja y salir del backoffice?'))return;
+  closingShift=true;
+  const button=document.getElementById('shiftActionBtn');if(button)button.disabled=true;
+  try{
+    const shift={...currentShift};
+    if(!await printCashbook(shift))return;
+    const r=await db.rpc('close_staff_shift');
+    if(r.error)throw Error('La hoja se envió a la impresora, pero no se pudo cerrar el turno: '+r.error.message);
+    sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()
+  }catch(e){alert(e.message)}finally{closingShift=false;if(button)button.disabled=false}
 }
 async function startManagerShiftFromFree(){
   if(currentProfile?.role!=='manager'||currentAccessMode!=='free')return;
@@ -259,7 +266,7 @@ function profileItem(label,value,cls=''){return '<div class="profileItem"><div c
 let subscriberPayments=[];let selectedSubscribers=new Set();let issuedParkingInvoices=[];
 function storedInvoice(type,id,month){return issuedParkingInvoices.find(x=>x.entity_type===type&&x.entity_id===id&&(type==='reservation'||x.billing_month===month))}
 async function loadIssuedParkingInvoices(){if(!['admin','manager'].includes(currentProfile?.role)){issuedParkingInvoices=[];return}const r=await db.from('parking_invoices').select('*').order('issued_at',{ascending:false});if(r.error){console.error('Facturas:',r.error);return}issuedParkingInvoices=r.data||[];renderMonthlySubscribers();renderReservations()}
-const PARKING_PRINTERS={invoice:'FACTURAS',stay:'RICOH MP 2003',ticket:'BIXOLON SRP-350III'};
+const PARKING_PRINTERS={invoice:'FACTURAS',stay:'RICOH MP 2003',cashbook:'RICOH MP 2003',ticket:'BIXOLON SRP-350III'};
 const PARKING_QZ_IDENTITY_DB='parking-qz-identity-v1';
 let parkingQzIdentity=null,parkingQzSigningLoaded=false;
 function parkingQzIdentityStore(mode,identity){return new Promise((resolve,reject)=>{const request=indexedDB.open(PARKING_QZ_IDENTITY_DB,1);request.onupgradeneeded=()=>request.result.createObjectStore('identity');request.onerror=()=>reject(new Error('Chrome no permite guardar la autorización local de QZ.'));request.onsuccess=()=>{const database=request.result;const tx=database.transaction('identity',mode);const store=tx.objectStore('identity');let result=null;const op=mode==='readwrite'?store.put(identity,'current'):store.get('current');op.onsuccess=()=>{result=op.result};tx.oncomplete=()=>{database.close();resolve(mode==='readwrite'?identity:result||null)};tx.onabort=()=>{database.close();reject(new Error('No se pudo guardar o leer la autorización local de QZ.'))}}})}
@@ -295,7 +302,7 @@ async function sendParkingPrint(kind,html){
  try{
   const hotelHtml=kind==='stay'&&html.includes('Bonos hotel ');
   const jobHtml=hotelHtml?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;margin:0!important;padding:0!important}.coupon{width:100mm!important;height:210mm!important;break-after:page!important}.coupon:last-child{break-after:auto!important}</style></head>'):kind==='stay'?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;height:210mm!important;margin:0!important;overflow:hidden!important}.ticket{margin:0 auto!important}.actions{display:none!important}</style></head>'):html;
-  const cfg=kind==='ticket'?{copies:1,color:false,size:{width:80,height:200},units:'mm',orientation:'portrait',margins:0}:kind==='stay'?parkingStayPrintConfig():{copies:1,color:false};
+  const cfg=kind==='ticket'?{copies:1,color:false,size:{width:80,height:200},units:'mm',orientation:'portrait',margins:0}:kind==='stay'?parkingStayPrintConfig():kind==='cashbook'?parkingCashbookPrintConfig():{copies:1,color:false};
   if(hotelHtml){const pages=hotelCouponPrintPages(jobHtml);let sent=0;try{for(const pageHtml of pages){parkingQzStage='Enviando bono de hotel '+(sent+1)+' de '+pages.length+' a '+target;await qz.print(qz.configs.create(target,parkingStayPrintConfig()),[parkingHtmlPrintData('stay',pageHtml)]);sent++}}catch(e){throw new Error('Se han enviado '+sent+' de '+pages.length+' bonos a la cola. No repitas la tanda completa para evitar duplicados. Detalle: '+(e.message||e))}}
   else await qz.print(qz.configs.create(target,cfg),[parkingHtmlPrintData(kind,jobHtml)])
  }
@@ -560,7 +567,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 </script>
 <script src="assets/jsbarcode-code128.min.js"></script>
 <script src="rates-planning.js?v=real-spots-20261016"></script>
-<script src="operations.js?v=real-spots-20261016"></script>
+<script src="operations.js?v=cashbook-a5-20261016"></script>
 <script src="blacklist.js?v=20261015"></script>
 <script src="hotel-vouchers.js?v=voucher-enter-20261016"></script>
 <script src="bank-invoice-mail.js?v=bank-fixed-20261015-20261015"></script>
@@ -568,5 +575,5 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="stay-completion.js?v=manual-finish-20261016"></script>
 <script src="staff-users.js?v=users-20261016"></script>
 <script src="rotation-spots.js?v=real-spots-20261016"></script>
-<script src="print-profiles.js?v=locked-portrait-20261016"></script>
+<script src="print-profiles.js?v=cashbook-a5-20261016"></script>
 </body></html>

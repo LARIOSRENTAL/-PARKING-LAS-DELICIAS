@@ -5,3 +5,5 @@ const functionText=source.split('\n').find(l=>l.startsWith('async function scanR
 
 require('./rotation-spots-ui.cjs');
 require('./print-profiles.cjs');
+
+require('./cashbook-close.cjs');
