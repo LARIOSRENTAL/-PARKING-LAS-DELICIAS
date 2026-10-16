@@ -21,3 +21,7 @@ El trabajo `cashbook` usa exclusivamente RICOH MP 2003, A5 horizontal (perfil HO
 La foto del usuario demostró que el raster sin escalado no era correcto. En QZ PrintHTML.parseData se renderiza con zoom DPI/72 y se deriva a PrintImage, cuyo dpiScale parte de 1; sin ajuste físico la imagen puede quedar ampliada según la resolución. Los bonos de una hoja usan ajuste a página conservando la proporción, vertical, giro cero, 100×210 y las dimensiones HTML existentes. La caja multipágina usa el camino vectorial para no sufrir la misma amplificación y mantener paginación sin escalado.
 
 La regresión comprueba las dimensiones físicas de los trabajos normales y hotel a 203/300/600/1200 dpi y muestra que la configuración anterior supera 800 mm de anchura a 600 dpi. Fuente revisada: https://github.com/qzind/tray/blob/master/src/qz/printer/action/PrintHTML.java y PrintImage.java. Estas pruebas no sustituyen la impresión física con el controlador del puesto.
+
+## Resumen de cierre
+
+El cierre y el botón Imprimir resumen de caja imprimen únicamente los totales de Abonados, Estancias y Rotación, total cobrado y desglose por Tarjeta, Efectivo, Banco y Online. Incluyen fecha, turno y empleado en el cierre. No se imprimen matrículas, referencias ni movimientos individuales. El listado completo sigue disponible en pantalla. Se conserva el envío A5 horizontal por bandeja 1 de Ricoh y los ajustes locales ya definidos. La prueba usa 5000 cobros para comprobar que el tamaño del resumen no crece con los movimientos.
