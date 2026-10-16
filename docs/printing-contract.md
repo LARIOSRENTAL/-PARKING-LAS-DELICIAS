@@ -43,3 +43,21 @@ El controlador del puesto devuelve exactamente Automatic-Feeder, top, middle, ma
 ## Tamaño confirmado por el usuario (16/10, 21:30)
 
 El usuario confirma expresamente «A4 horizontal del perfil» tras mostrar HOJA DE CAJA con A4 210×297, horizontal, bandeja 1, papel normal y reciclado. Esto sustituye la petición anterior A5 y las referencias históricas A5 de este documento. El resumen se envía como A4 horizontal (área 285×198 mm, margen 6 mm), con la bandeja 1/top resuelta del controlador. Se conserva el tipo de papel configurado en el controlador; la web no cambia preferencias globales ni intenta activar por nombre un preset Ricoh. El resumen y el cierre usan la misma configuración. Las estancias/hotel 100×210 verticales no cambian.
+
+## Retirada de efectivo
+
+Retirada aparece después de Hoja de caja. Se introduce únicamente la cantidad; empleado, fecha y número correlativo R se asignan en servidor y quedan guardados en el turno propio abierto. El justificante ENTREGA DE EFECTIVO incluye «He recibido de», cantidad, «Recibí» con espacio para firma y fecha, en un recuadro centrado. Se imprime en A4 horizontal por la misma bandeja 1/top de la Ricoh, en un solo trabajo de dos copias. La configuración se copia por trabajo: el resumen conserva una copia y estancias/hotel/tickets no cambian.
+
+La retirada se registra antes del envío. Un fallo de impresora conserva el justificante y permite Reimprimir 2 copias sin insertar otro movimiento. Una solicitud con respuesta de red incierta conserva su identificador en la sesión del navegador para recuperarse tras recargar. El servidor verifica turno propio, importe e identidad de solicitud, bloquea el turno y evita duplicados concurrentes. El historial es de solo lectura con RLS; los empleados ven sus retiradas y gerente/admin pueden consultar otras. Las retiradas se presentan separadas de los ingresos en caja; «Efectivo del turno menos retiradas» no representa un saldo final, pues todavía no existe saldo inicial/recuento en esta funcionalidad.
+
+Pruebas: cash-withdrawals-db.cjs (Postgres aislado, RLS y permisos), cash-withdrawals-ui.cjs (registro, fallo de impresión, reimpresión y recuperación de red) y print-profiles.cjs (dos copias por la bandeja exacta sin modificar otras impresiones). No se crean retiradas ni se imprimen justificantes reales durante las pruebas.
+
+## Aislamiento del tipo de papel (16/10, captura 21:52)
+
+El dispositivo ya recibe bandeja 1 pero solicita Papel grueso 3, heredado de las preferencias de la cola RICOH MP 2003. QZ PrintPixel declara pendiente el ajuste del grosor/tipo y no permite seleccionar un preset Ricoh por nombre. No se añade una opción ficticia paperType ni se cambian los valores globales. Caja y retirada pasan a la cola de Windows independiente HOJA DE CAJA, que debe apuntar al mismo controlador y puerto Ricoh, con el preset ya existente A4 horizontal, bandeja 1 y Normal y reciclado. Un preset de un clic no equivale a otra cola de Windows. Si falta esta cola, se detiene el envío con instrucciones; no se recurre a la cola de estancias ni a otra impresora. Crear y configurar esa cola en el ordenador queda pendiente de intervención local, fuera del acceso web. No establecerla como predeterminada. Las facturas siguen usando FACTURAS y los bonos RICOH MP 2003.
+
+En Windows puede crearse sin modificar la cola original mediante Get-Printer de RICOH MP 2003 y Add-Printer -Name 'HOJA DE CAJA' con su DriverName y PortName; después se selecciona el preset HOJA DE CAJA solamente en las preferencias de la nueva cola. La web establece una copia para resumen y dos para retirada por trabajo.
+
+El menú principal pasa a 1. Rotación, 2. Estancias, 3. Abonados y abre Rotación al entrar. Planning de plazas sale del submenú Estancias y queda junto a Hoja de caja y Retirada, manteniendo su única vista, filtros, permisos y refresco automático. Las pruebas de navegación verifican carga y refresco en la nueva ubicación.
+
+La revisión de avisos de Supabase identifica el aviso genérico de función SECURITY DEFINER ejecutable para usuarios autenticados. Es intencional para parking_register_cash_withdrawal: la API es de personal, rechaza anónimos/inactivos/turno ajeno y necesita escritura atómica con auditoría sin conceder INSERT directo. Se verifican en Postgres los permisos de tabla, RLS y autorización dentro de la función.

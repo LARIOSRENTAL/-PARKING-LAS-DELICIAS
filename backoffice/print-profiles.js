@@ -18,7 +18,7 @@ function parkingCashbookTrayName(printer){
  // Ricoh MP 2003 Windows/Java names observed on this workstation:
  // DMBIN_UPPER (1) = MediaTray.TOP; DMBIN_MIDDLE (3) = MIDDLE.
  // Only this queue and the observed top/middle driver family use this alias.
- if(matches.length===0&&printer?.name==='RICOH MP 2003'){
+ if(matches.length===0&&['RICOH MP 2003','HOJA DE CAJA'].includes(printer?.name)){
   const top=trays.filter(name=>typeof name==='string'&&name.trim().toLowerCase()==='top');
   const middle=trays.some(name=>typeof name==='string'&&name.trim().toLowerCase()==='middle');
   if(top.length===1&&middle)return top[0]
@@ -26,14 +26,14 @@ function parkingCashbookTrayName(printer){
  if(matches.length!==1)throw new Error('No se identifica una única bandeja 1 en la Ricoh. Bandejas comunicadas: '+trays.join(', ')+'. No se ha impreso el resumen.');
  return matches[0]
 }
-async function parkingCashbookPrintConfigForPrinter(target){
+async function parkingCashbookPrintConfigForPrinter(target,kind='cashbook'){
  const details=await qz.printers.details(),printers=Array.isArray(details)?details:[details],printer=printers.find(p=>p?.name===target);
  if(!printer)throw new Error('No se pudieron consultar las bandejas de '+target+'.');
- return parkingCashbookPrintConfig(parkingCashbookTrayName(printer))
+ const config=parkingCashbookPrintConfig(parkingCashbookTrayName(printer));if(kind==='withdrawal'){config.copies=2;config.jobName='RETIRADA DE EFECTIVO · 2 COPIAS · BANDEJA 1'}return config
 }
 function parkingHtmlPrintData(kind,html){
  const data={type:'pixel',format:'html',flavor:'plain',data:html};
  if(kind==='stay')data.options={pageWidth:100,pageHeight:210};
- if(kind==='cashbook')data.options={pageWidth:285,pageHeight:198};
+ if(kind==='cashbook'||kind==='withdrawal')data.options={pageWidth:285,pageHeight:198};
  return data;
 }
