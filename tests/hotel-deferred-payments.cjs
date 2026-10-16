@@ -1,4 +1,4 @@
-module.exports=async({db,q,scalar,root,assert,user,other})=>{
+module.exports=async({db,q,scalar,root,assert,user,other,type})=>{
  const fs=require('fs'),path=require('path');
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261015220850_hotel_deferred_payments.sql'),'utf8'));
  const count=()=>scalar("select count(*)::int from parking_cash_movements");
@@ -25,5 +25,10 @@ module.exports=async({db,q,scalar,root,assert,user,other})=>{
  const large=await scalar("select parking_buy_hotel_batch('HOTEL FACTURA GRANDE',300,'pending')");await assert.rejects(()=>scalar("select parking_collect_hotel_batch($1,'card',true,null)",[large.id]),/factura completa/);assert.equal(await scalar('select payment_status from parking_hotel_batches where id=$1',[large.id]),'pending');assert.equal(await scalar('select count(*)::int from parking_cash_movements where entity_id=$1',[large.id]),0);
  await assert.rejects(()=>scalar("select parking_collect_hotel_batch($1,'pending',false,null)",[large.id]),/efectivo/);
  const codesBefore=await scalar('select count(*)::int from parking_hotel_vouchers where batch_id=$1',[invoiceBatch.id]);await scalar('select parking_hotel_batch_vouchers($1)',[invoiceBatch.id]);assert.equal(await scalar('select count(*)::int from parking_hotel_vouchers where batch_id=$1',[invoiceBatch.id]),codesBefore);
- console.log('Hotel pendiente: preparación sin caja; pago en turno real; reintentos sin duplicados; ticket tarjeta; factura completa sin simplificada; inmutabilidad y permisos verificados.');
+ const testHotel=await scalar("insert into parking_hotels(name)values('PRUEBAS LECTOR CANJE')returning id"),testBatch=await scalar('insert into parking_hotel_batches(hotel_id,first_control,days,unit_price_eur,is_test)values($1,nextval(\'parking_hotel_control_seq\'),5,13,true)returning id',[testHotel]);
+ const testCode=await scalar('select code from parking_hotel_vouchers where batch_id=$1 order by number limit 1',[testBatch]),cashBeforeTest=await count();
+ assert.equal((await scalar('select parking_resolve_hotel_vouchers($1)',[[testCode]])).available_days,5);
+ const testStay=await scalar("select parking_create_stay_from_vouchers($1,$2,clock_timestamp(),1,'TESTBONO','MODELO PRUEBA',null,null,null,null)",[[testCode],type]);
+ assert(testStay.id);assert.equal(await scalar('select redeemed_reservation_id from parking_hotel_vouchers where code=$1',[testCode]),testStay.id);assert.equal(await scalar('select available_days from parking_hotel_balances where id=$1',[testHotel]),4);assert.equal(await count(),cashBeforeTest);await assert.rejects(()=>scalar('select parking_resolve_hotel_vouchers($1)',[[testCode]]),/utilizado/);
+ console.log('Hotel pendiente: preparación sin caja; pago en turno real; reintentos sin duplicados; ticket/factura y permisos verificados. Lote de prueba de cinco bonos: canje válido y estancia sin cobro duplicado verificados.');
 };
