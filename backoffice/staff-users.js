@@ -5,7 +5,8 @@ const staffElement=id=>document.getElementById(id);
 const staffNav=document.createElement('button');staffNav.dataset.area='myUser';staffNav.textContent='Mi usuario';staffNav.onclick=()=>showArea('myUser');document.querySelector('.mainNav').appendChild(staffNav);
 const staffSection=document.createElement('section');staffSection.id='myUser';staffSection.className='section';staffSection.innerHTML='<h2>Mi usuario</h2><div id="myUserDetails"></div>';document.getElementById('users').after(staffSection);
 const previousStaffShowArea=showArea;
-showArea=function(area){previousStaffShowArea(area);if(area==='myUser')renderMyUser()};
+showArea=function(area){if(area==='myUser'&&canManageStaff())area='users';previousStaffShowArea(area);if(area==='myUser')renderMyUser()};
+function syncStaffNavigation(){staffNav.classList.toggle('hidden',canManageStaff());if(canManageStaff())staffSection.classList.remove('active')}
 function renderMyUser(){const el=staffElement('myUserDetails');el.innerHTML=`<div class="panel"><h3>${esc(currentProfile?.full_name||'Mi cuenta')}</h3><p>${esc(currentSession?.user?.email||'')}</p><p>Permiso: ${esc(staffRoleLabel(currentProfile?.role))}</p><button class="btn blue" onclick="openStaffPanel()">Cambiar mi contraseña</button></div>`}
 function staffRoleLabel(role){return {admin:'Administrador',manager:'Gerente',employee:'Empleado'}[role]||role||''}
 loadStaffUsers=async function(){if(!canManageStaff())return;usersBody.innerHTML='<div class="msg">Cargando usuarios…</div>';try{const data=await staffApi('list');staffUsers=data.users||[];renderStaffUsers()}catch(e){usersBody.innerHTML=`<div class="msg error">${esc(e.message)}</div>`}};

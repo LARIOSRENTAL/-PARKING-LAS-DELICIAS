@@ -49,7 +49,7 @@ async function updateManualPrice(){
  if(r.data!==null)field.value=Number(r.data).toFixed(2);
 }
 function availableInventorySpot(s){return !s.inventory_state||s.inventory_state==='available'}
-function freeSpotsFor(typeId){const used=new Set([...insideSessions,...rotationSpotSessions].map(s=>s.spot_id).filter(Boolean)),reserved=reservedOutsideSpotIds();return spots.filter(s=>availableInventorySpot(s)&&(s.polyvalent||s.vehicle_type_id===typeId)&&!used.has(s.id)&&!reserved.has(s.id)&&!activeBlockForSpot(s.id))}
+function freeSpotsFor(typeId){const used=new Set([...insideSessions,...rotationSpotSessions].map(s=>s.spot_id).filter(Boolean)),reserved=reservedOutsideSpotIds();return spots.filter(s=>availableInventorySpot(s)&&(s.polyvalent||s.vehicle_type_id===typeId||(s.code==='P-11'&&vehicleTypes.find(v=>v.id===typeId)?.code==='XL'))&&!used.has(s.id)&&!reserved.has(s.id)&&!activeBlockForSpot(s.id))}
 async function loadSpots(){
  const rotationRows=await db.from('rotation_sessions').select('id,spot_id,plate,entry_at').eq('status','inside').eq('billing_only',false);
  if(rotationRows.error){document.getElementById('spotsBody').textContent='No se pudo consultar la ocupación de Rotación: '+rotationRows.error.message;return}
