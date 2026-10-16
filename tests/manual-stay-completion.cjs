@@ -1,0 +1,22 @@
+module.exports=async({db,q,scalar,root,assert,type,user})=>{
+ const fs=require('fs'),path=require('path');
+ await db.exec("alter table parking_spots add column if not exists inventory_state text not null default 'available';alter table parking_spots add column if not exists polyvalent boolean not null default false;");
+ for(const f of require('./fixtures/manual-stay-functions.json'))await db.exec(f.definition);
+ await db.exec("create function private.spot_accepts_vehicle(p_spot uuid,p_type uuid)returns boolean language sql as $$select exists(select 1 from parking_spots where id=p_spot and vehicle_type_id=p_type and active)$$");
+ await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016083120_manual_stay_completion.sql'),'utf8'));
+ const spot=await scalar("insert into parking_spots(code,vehicle_type_id)values('MANUAL-FIN',$1)returning id",[type]);
+ const create=plate=>scalar("insert into reservations(vehicle_type_id,entry_at,duration_days,plate,vehicle_make_model,payment_method,status,payment_status,manual_price_override)values($1,clock_timestamp()-interval '2 days',1,$2,'PRUEBA','cash','confirmed','paid',true)returning id",[type,plate]);
+ const availability=()=>scalar('select private.get_available_spaces($1,clock_timestamp(),clock_timestamp()+interval \'1 day\',null)',[type]),availableBefore=await availability();
+ const first=await create('FIN1111');
+ // Start before its planned expiry, then exercise movement after expiry.
+ const session=await scalar("select backoffice_check_in($1,$2,clock_timestamp()-interval '2 days')",[first,spot]);
+ await scalar("select record_parking_movement($1,'OUT')",[first]);assert.equal(await scalar('select status from reservations where id=$1',[first]),'confirmed');assert.equal(await scalar('select assigned_spot_id from reservations where id=$1',[first]),spot);assert.equal(await availability(),Math.max(0,availableBefore-1));
+ const second=await create('FIN2222');await assert.rejects(()=>scalar("select backoffice_check_in($1,$2,clock_timestamp()-interval '2 days')",[second,spot]),/reservada/);
+ await scalar('select backoffice_check_in($1,$2,clock_timestamp())',[first,spot]);assert.equal(await scalar('select status from parking_sessions where id=$1',[session]),'inside');
+ await assert.rejects(()=>scalar('select transition_reservation_to_rotation($1)',[first]),/Finalizar estancia/);
+ await scalar("select record_parking_movement($1,'OUT')",[first]);const out=await scalar('select parking_finish_stay($1)',[first]);assert.equal(out.rotation,null);assert.equal(await scalar('select status from reservations where id=$1',[first]),'completed');assert.equal(await scalar('select assigned_spot_id from reservations where id=$1',[first]),null);
+ assert.equal(await availability(),availableBefore);assert.equal((await scalar('select parking_finish_stay($1)',[first])).already_finished,true);await assert.rejects(()=>scalar('select backoffice_check_in($1,$2,clock_timestamp())',[first,spot]),/cancelled/);
+ await scalar("select backoffice_check_in($1,$2,clock_timestamp()-interval '2 days')",[second,spot]);const finished=await scalar('select parking_finish_stay($1)',[second]);assert(finished.rotation.rotation_session_id);assert.equal(await scalar('select assigned_spot_id from reservations where id=$1',[second]),null);assert.equal(await scalar('select status from reservations where id=$1',[second]),'completed');assert.equal(await scalar('select count(*)::int from rotation_sessions where source_reservation_id=$1',[second]),1);await scalar('select parking_finish_stay($1)',[second]);assert.equal(await scalar('select count(*)::int from rotation_sessions where source_reservation_id=$1',[second]),1);
+ const future=await scalar("insert into reservations(vehicle_type_id,entry_at,duration_days,plate,vehicle_make_model,payment_method,status,payment_status)values($1,clock_timestamp(),1,'FIN3333','PRUEBA','cash','confirmed','paid')returning id",[type]);await scalar('select backoffice_check_in($1,$2,clock_timestamp())',[future,spot]);const normal=await scalar('select parking_finish_stay($1)',[future]);assert.equal(normal.rotation,null);assert.equal(await scalar('select assigned_spot_id from reservations where id=$1',[future]),null);
+ console.log('Fin manual: salida vencida conserva plaza y estado; otra estancia bloqueada; reentrada vencida; finalización dentro/fuera, plaza liberada, exceso en Rotación solo al finalizar y reintento único verificados.');
+};

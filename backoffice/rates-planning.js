@@ -55,7 +55,7 @@ async function loadSpots(){
  const date=document.getElementById('spotPlanDate')?.value||localInput(new Date()).slice(0,10),start=new Date(date+'T00:00:00'),end=new Date(date+'T00:00:00');end.setDate(end.getDate()+1);
  const overlap=(a,b)=>new Date(a)<end&&new Date(b)>start;
  const stateFilter=document.getElementById('spotStateFilter')?.value||'',classFilter=document.getElementById('spotClassFilter')?.value||'';
- const live=reservations.filter(r=>!r.rotation_pending&&['confirmed','checked_in','pending_payment'].includes(r.status)&&overlap(r.entry_at,r.exit_at));
+ const live=reservations.filter(r=>!r.rotation_pending&&['confirmed','checked_in','pending_payment'].includes(r.status)&&(overlap(r.entry_at,r.exit_at)||(r.last_movement_at&&['confirmed','checked_in'].includes(r.status)&&new Date(r.entry_at)<end)));
  const used=new Map(insideSessions.filter(s=>s.spot_id).map(s=>[s.spot_id,s]));
  const zones=[...new Set(spots.map(s=>s.inventory_state==='legacy'?'PENDIENTES DE UBICAR':s.zone||'OTRAS'))];
  let html='<div class="msg">218 plazas del listado + 30 plazas de reserva polivalentes. FIJO: abonados · OCUPADO: bloqueada · PEQUEÑO-XL: categoría mixta.</div>';
@@ -63,7 +63,7 @@ async function loadSpots(){
  const assigned=live.filter(r=>r.assigned_spot_id===s.id),u=used.get(s.id),b=capacityBlocks.find(b=>b.spot_id===s.id&&overlap(b.starts_at,b.ends_at));
  let state=s.inventory_state==='fixed'?'FIJO':s.inventory_state==='blocked'?'OCUPADO':b?'BLOQUEADA':assigned.length?'RESERVADA':s.inventory_state==='legacy'?'PENDIENTE DE UBICAR':'LIBRE';
  if(assigned.some(r=>r.last_movement_at))state=assigned.some(r=>r.vehicle_presence==='DENTRO')?'DENTRO':'FUERA';
- if(u&&overlap(u.actual_entry_at||u.planned_entry_at,u.planned_exit_at||'2999-01-01'))state='DENTRO';
+ if(u&&new Date(u.actual_entry_at||u.planned_entry_at)<end)state='DENTRO';
  if(stateFilter&&stateFilter!==state)continue;if(classFilter&&s.spot_class!==classFilter)continue;
  const cls=state==='LIBRE'?'free':['FIJO','OCUPADO','BLOQUEADA'].includes(state)?'blocked':state==='DENTRO'?'busy':'reservedOut';
  const detail=assigned.map(r=>'<div><b>'+esc(r.plate||r.reference)+'</b><br><small>'+fmt(r.entry_at)+' → '+fmt(r.exit_at)+'</small></div>').join('')|| (u?'<div>'+esc(u.plate)+'</div>':'');
@@ -75,6 +75,7 @@ async function editInventoryState(id){
  if(!canManageRates())return;const spot=spots.find(s=>s.id===id);if(!spot)return;
  const answer=prompt('Estado de '+spot.code+': LIBRE, FIJO u OCUPADO',({available:'LIBRE',fixed:'FIJO',blocked:'OCUPADO'})[spot.inventory_state]);if(answer===null)return;
  const state=({LIBRE:'available',FIJO:'fixed',OCUPADO:'blocked'})[answer.trim().toUpperCase()];if(!state)return alert('Estado no válido.');
- if(state!=='available'&&(insideSessions.some(s=>s.spot_id===id)||reservations.some(r=>r.assigned_spot_id===id&&['confirmed','checked_in','pending_payment'].includes(r.status)&&new Date(r.exit_at)>new Date())))return alert('Esta plaza tiene una estancia o reserva asignada. Cámbiala de plaza antes.');
+ if(state!=='available'&&(insideSessions.some(s=>s.spot_id===id)||reservations.some(r=>r.assigned_spot_id===id&&['confirmed','checked_in','pending_payment'].includes(r.status)&&(r.last_movement_at||new Date(r.exit_at)>new Date()))))return alert('Esta plaza tiene una estancia o reserva asignada. Cámbiala de plaza antes.');
  const r=await db.from('parking_spots').update({inventory_state:state}).eq('id',id);if(r.error)return alert(r.error.message);spot.inventory_state=state;await loadSpots();await loadReservations();
 }
+
