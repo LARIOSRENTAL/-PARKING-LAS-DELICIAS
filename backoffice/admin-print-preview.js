@@ -19,20 +19,25 @@ function clearAdminPrintJobs(){for(const job of adminPrintJobs)if(job.pdfUrl)URL
 function printAdminDocumentHere(){const job=activeAdminPrintJob(),frame=document.getElementById('adminPrintPreviewFrame');if(!job||job.frame!==frame)return;const copies=frame.contentDocument.querySelectorAll('.adminExtraPrintCopy');copies.forEach(e=>e.remove());if(job.copies===2){const sheet=frame.contentDocument.querySelector('.sheet');if(sheet){const copy=sheet.cloneNode(true);copy.classList.add('adminExtraPrintCopy');copy.style.breakBefore='page';frame.contentDocument.body.appendChild(copy);const remove=()=>copy.remove();frame.contentWindow.addEventListener('afterprint',remove,{once:true});setTimeout(remove,60000)}}frame.contentWindow.focus();frame.contentWindow.print()}
 async function printAdminDocumentOffice(){const job=activeAdminPrintJob();if(!job)return;const msg=document.getElementById('adminPrintPreviewMessage');msg.textContent='Enviando a la impresora de oficina…';try{await sendParkingPrint(job.kind,job.html,true);msg.textContent='Documento enviado a la impresora de oficina · '+job.copies+' copia(s).'}catch(e){msg.textContent=e.message}}
 function loadAdminPreviewLibrary(){if(adminPreviewLibrary)return adminPreviewLibrary;adminPreviewLibrary=loadParkingPdfLibraries().then(()=>new Promise((resolve,reject)=>{if(window.html2canvas)return resolve();const script=document.createElement('script');script.src='assets/vendor/html2canvas.min.js?v=1.4.1';script.onload=resolve;script.onerror=()=>reject(Error('No se pudo cargar el generador de PDF.'));document.head.appendChild(script)})).catch(e=>{adminPreviewLibrary=null;throw e});return adminPreviewLibrary}
+function adminPdfStep(text){const el=document.getElementById('adminPrintPreviewMessage');if(el)el.textContent=text}
+function adminPdfDeadline(promise,ms,stage){return Promise.race([Promise.resolve(promise),new Promise((_,reject)=>setTimeout(()=>reject(Error('Tiempo de espera agotado en '+stage+'. Usa Imprimir en este equipo / Guardar como PDF.')),ms))])}
 async function adminDocumentPdf(job){
  if(!adminPrintAllowed()||job.owner!==currentSession?.user?.id)throw Error('No autorizado');
  if(job.pdfUrl)return job.pdfUrl;
  if(job.pdfPromise)return job.pdfPromise;
  job.pdfPromise=(async()=>{
-  await loadAdminPreviewLibrary();
+  adminPdfStep('PDF: cargando bibliotecas…');
+  await adminPdfDeadline(loadAdminPreviewLibrary(),12000,'carga de bibliotecas');
   if(!window.jspdf?.jsPDF||typeof window.html2canvas!=='function')throw Error('No se han cargado las bibliotecas del PDF.');
   // Render the SAME visible iframe that the administrator already sees. A hidden,
   // off-screen iframe can report zero layout dimensions on iPad Safari.
   const frame=document.getElementById('adminPrintPreviewFrame');
   if(!frame||job.frame!==frame||!frame.contentDocument?.body)throw Error('Espera a que termine de cargar la previsualización.');
   const doc=frame.contentDocument;
-  if(doc.fonts?.ready)await doc.fonts.ready;
+  adminPdfStep('PDF: preparando fuentes…');
+  if(doc.fonts?.ready)await adminPdfDeadline(doc.fonts.ready,3000,'fuentes');
   await Promise.all(Array.from(doc.images,img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});setTimeout(resolve,2500)})));
+  adminPdfStep('PDF: calculando páginas…');
   const mmToPx=96/25.4;
   const contentWidthPx=Math.max(1,Math.ceil(job.spec.contentWidth*mmToPx));
   const pageHeightPx=Math.max(1,Math.floor(job.spec.contentHeight*mmToPx));
@@ -45,8 +50,9 @@ async function adminDocumentPdf(job){
   let pages=0;
   for(let copy=0;copy<job.copies;copy++){
    for(let y=0;y<total;y+=pageHeightPx){
+    adminPdfStep('PDF: generando página '+(pages+1)+'…');
     const sliceHeight=Math.min(pageHeightPx,total-y);
-    const canvas=await window.html2canvas(doc.body,{scale:1.5,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',width:contentWidthPx,height:sliceHeight,x:0,y,scrollX:0,scrollY:0,windowWidth:contentWidthPx,windowHeight:Math.ceil(pageHeightPx),logging:false});
+    const canvas=await adminPdfDeadline(window.html2canvas(doc.body,{scale:1,useCORS:true,allowTaint:false,imageTimeout:3500,backgroundColor:'#ffffff',width:contentWidthPx,height:sliceHeight,x:0,y,scrollX:0,scrollY:0,windowWidth:contentWidthPx,windowHeight:Math.ceil(pageHeightPx),logging:false}),15000,'renderizado de página '+(pages+1));
     if(!canvas.width||!canvas.height)throw Error('No se ha podido renderizar el documento.');
     if(pages++)pdf.addPage([job.spec.width,job.spec.height],job.spec.width>job.spec.height?'landscape':'portrait');
     pdf.addImage(canvas.toDataURL('image/jpeg',0.9),'JPEG',job.spec.margin,job.spec.margin,job.spec.contentWidth,sliceHeight/mmToPx,undefined,'FAST');
@@ -54,6 +60,7 @@ async function adminDocumentPdf(job){
    }
   }
   if(!adminPrintAllowed()||job.owner!==currentSession?.user?.id)throw Error('Sesión finalizada');
+  adminPdfStep('PDF: finalizando archivo…');
   job.pdfUrl=URL.createObjectURL(pdf.output('blob'));
   return job.pdfUrl;
  })().catch(e=>{job.pdfPromise=null;throw e});
