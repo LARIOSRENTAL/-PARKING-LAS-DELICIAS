@@ -118,18 +118,28 @@ async function cancelManagerAccess(){managerAccessModal.classList.add('hidden');
 async function logout(){sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()}
 let closingShift=false;
 async function closeShiftAndLogout(){
-  if(closingShift)return;
-  if(currentAccessMode==='free'||!currentShift)return logout();
-  if(!confirm('¿Cerrar el turno '+currentShift.shift_code+', imprimir su hoja de caja y salir del backoffice?'))return;
-  closingShift=true;
-  const button=document.getElementById('shiftActionBtn');if(button)button.disabled=true;
-  try{
-    const shift={...currentShift};
-    if(!await printCashbook(shift))return;
-    const r=await db.rpc('parking_close_cash_shift',{p_shift_id:shift.id,p_expected:parkingCashbookPrintedData});
-    if(r.error)throw Error('La hoja se envió a la impresora, pero no se pudo cerrar el turno: '+r.error.message);
-    sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()
-  }catch(e){alert(e.message)}finally{closingShift=false;if(button)button.disabled=false}
+ if(closingShift)return;
+ if(currentAccessMode==='free'||!currentShift)return logout();
+ closingShift=true;
+ const button=document.getElementById('shiftActionBtn');if(button)button.disabled=true;
+ try{
+  const shift={...currentShift};
+  if(typeof cashCountDirty!=='undefined'&&cashCountDirty&&typeof saveCashCount==='function'){
+   if(!await saveCashCount(true))throw Error('Guarda el arqueo antes de cerrar.');
+  }
+  const q=await db.rpc('parking_cashbook',{p_date:shift.shift_date,p_shift_code:Number(shift.shift_code),p_shift_id:shift.id});
+  if(q.error||!q.data||q.data.shift_id!==shift.id)throw Error('No se pudo recuperar la hoja de caja: '+(q.error?.message||'Turno no identificado'));
+  const report=q.data,cs=report.cash_state||{};
+  if(!cs.saved)throw Error('Guarda el arqueo con el dinero real antes de cerrar.');
+  const diff=Number(cs.difference||0);
+  const warning=Math.abs(diff)>0.001?'\\nDescuadre registrado: '+money(diff)+'. Se conserva el dinero real y los movimientos sin alterar.':'';
+  if(!confirm('¿Cerrar turno '+shift.shift_code+' con saldo contado de '+money(Number(cs.counted_total||0))+'?'+warning+'\\nLa impresión no impedirá el cierre.'))return;
+  try{await sendParkingPrint('cashbook',buildCashbookHtml(report));}catch(printError){console.warn('Impresión fallida, cierre continúa',printError);}
+  const res=await db.rpc('parking_close_cash_shift',{p_shift_id:shift.id,p_expected:report});
+  if(res.error)throw Error('No se pudo cerrar el turno: '+res.error.message);
+  sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload();
+ }catch(e){alert(e.message)}
+ finally{closingShift=false;if(button)button.disabled=false}
 }
 async function startManagerShiftFromFree(){
   if(currentProfile?.role!=='manager'||currentAccessMode!=='free')return;
