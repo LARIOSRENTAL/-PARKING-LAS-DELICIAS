@@ -63,7 +63,7 @@ async function printCashbook(shift=null){
   if(!selected)throw Error('Selecciona el turno y el empleado.');
   const r=await db.rpc('parking_cashbook',{p_date:selected.shift_date,p_shift_code:Number(selected.shift_code),p_shift_id:selected.id});if(r.error)throw r.error;if(!r.data||r.data.shift_id!==selected.id)throw Error('No se pudo identificar la caja de este turno.');
   data=r.data;
-  if(shift&&(!data.cash_state?.saved||Math.abs(Number(data.cash_state.difference))>0.001)){if(typeof showCashbookTab==='function'){showArea('cashbook');showCashbookTab('count');await loadCashbook()}throw Error(!data.cash_state?.saved?'Rellena y guarda el Resumen de caja antes de cerrar el turno.':'El dinero contado más los vales no coincide con el saldo de salida. Revisa el Resumen de caja.');}
+  if(shift&&!data.cash_state?.saved){if(typeof showCashbookTab==='function'){showArea('cashbook');showCashbookTab('count');await loadCashbook()}throw Error('Rellena y guarda el Resumen de caja antes de cerrar el turno.')}if(shift&&Math.abs(Number(data.cash_state?.difference||0))>0.001){if(!confirm('El arqueo presenta una diferencia de '+money(Number(data.cash_state.difference))+'. Se conservarán los importes reales y el descuadre en la hoja de caja. ¿Confirmas el cierre del turno igualmente?'))return false;}
   await sendParkingPrint('cashbook',buildCashbookHtml(data));parkingCashbookPrintedData=data;return true;
  }catch(e){alert('No se pudo imprimir la hoja de caja: '+e.message);return false}
 }
