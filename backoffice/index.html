@@ -134,7 +134,7 @@ async function closeShiftAndLogout(){
   const diff=Number(cs.difference||0);
   const warning=Math.abs(diff)>0.001?'\\nDescuadre registrado: '+money(diff)+'. Se conserva el dinero real y los movimientos sin alterar.':'';
   if(!confirm('¿Cerrar turno '+shift.shift_code+' con saldo contado de '+money(Number(cs.counted_total||0))+'?'+warning+'\\nLa impresión no impedirá el cierre.'))return;
-  try{await sendParkingPrint('cashbook',buildCashbookHtml(report));}catch(printError){console.warn('Impresión fallida, cierre continúa',printError);}
+  try{await Promise.race([sendParkingPrint('cashbook',buildCashbookHtml(report)),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora no responde')),5000))]);}catch(printError){console.warn('Impresión fallida, cierre continúa',printError);}
   const res=await db.rpc('parking_close_cash_shift',{p_shift_id:shift.id,p_expected:report});
   if(res.error)throw Error('No se pudo cerrar el turno: '+res.error.message);
   sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload();
