@@ -26,50 +26,40 @@ async function adminDocumentPdf(job){
  job.pdfPromise=(async()=>{
   await loadAdminPreviewLibrary();
   if(!window.jspdf?.jsPDF||typeof window.html2canvas!=='function')throw Error('No se han cargado las bibliotecas del PDF.');
-  const frame=document.createElement('iframe');
-  frame.setAttribute('sandbox','allow-same-origin');
-  frame.setAttribute('aria-hidden','true');
-  frame.style.cssText='position:fixed;left:0;top:0;z-index:-1;opacity:0;pointer-events:none;border:0;width:'+job.spec.contentWidth+'mm;height:'+job.spec.contentHeight+'mm';
-  const loaded=new Promise((resolve,reject)=>{frame.onload=resolve;frame.onerror=()=>reject(Error('No se pudo preparar el documento.'))});
-  document.body.appendChild(frame);
-  frame.srcdoc=job.html;
-  try{
-   await loaded;
-   prepareAdminPreviewDocument(frame,job);
-   const doc=frame.contentDocument;
-   if(!doc?.body)throw Error('No se pudo acceder al documento.');
-   if(doc.fonts?.ready)await doc.fonts.ready;
-   await Promise.all(Array.from(doc.images,img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});setTimeout(resolve,2500)})));
-   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-   const mmToPx=96/25.4;
-   const contentWidthPx=Math.ceil(job.spec.contentWidth*mmToPx);
-   const pageHeightPx=Math.max(1,Math.floor(job.spec.contentHeight*mmToPx));
-   const total=Math.max(doc.documentElement.scrollHeight,doc.body.scrollHeight,doc.body.offsetHeight);
-   if(!Number.isFinite(total)||total<1)throw Error('El documento no tiene contenido imprimible.');
-   const pdf=new window.jspdf.jsPDF({compress:true,unit:'mm',format:[job.spec.width,job.spec.height],orientation:job.spec.width>job.spec.height?'landscape':'portrait'});
-   let pages=0;
-   for(let copy=0;copy<job.copies;copy++){
-    for(let y=0;y<total;y+=pageHeightPx){
-     const sliceHeight=Math.min(pageHeightPx,total-y);
-     const canvas=await window.html2canvas(doc.body,{scale:1.6,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',width:contentWidthPx,height:sliceHeight,x:0,y,scrollX:0,scrollY:0,windowWidth:contentWidthPx,windowHeight:Math.ceil(pageHeightPx),logging:false});
-     if(!canvas.width||!canvas.height)throw Error('No se ha podido renderizar el documento.');
-     if(pages++)pdf.addPage([job.spec.width,job.spec.height],job.spec.width>job.spec.height?'landscape':'portrait');
-     pdf.addImage(canvas.toDataURL('image/jpeg',0.9),'JPEG',job.spec.margin,job.spec.margin,job.spec.contentWidth,sliceHeight/mmToPx,undefined,'FAST');
-     canvas.width=canvas.height=1;
-    }
+  // Render the SAME visible iframe that the administrator already sees. A hidden,
+  // off-screen iframe can report zero layout dimensions on iPad Safari.
+  const frame=document.getElementById('adminPrintPreviewFrame');
+  if(!frame||job.frame!==frame||!frame.contentDocument?.body)throw Error('Espera a que termine de cargar la previsualización.');
+  const doc=frame.contentDocument;
+  if(doc.fonts?.ready)await doc.fonts.ready;
+  await Promise.all(Array.from(doc.images,img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});setTimeout(resolve,2500)})));
+  const mmToPx=96/25.4;
+  const contentWidthPx=Math.max(1,Math.ceil(job.spec.contentWidth*mmToPx));
+  const pageHeightPx=Math.max(1,Math.floor(job.spec.contentHeight*mmToPx));
+  const nodes=Array.from(doc.body.querySelectorAll('*'));
+  const rect=doc.body.getBoundingClientRect();
+  const deepest=Math.max(0,...nodes.map(el=>{const r=el.getBoundingClientRect();return Number.isFinite(r.bottom)?r.bottom-rect.top:0}));
+  const total=Math.ceil(Math.max(doc.documentElement.scrollHeight||0,doc.body.scrollHeight||0,doc.body.offsetHeight||0,rect.height||0,deepest));
+  if(!Number.isFinite(total)||total<1)throw Error('No se pudo medir el documento. Vuelve a abrir la previsualización.');
+  const pdf=new window.jspdf.jsPDF({compress:true,unit:'mm',format:[job.spec.width,job.spec.height],orientation:job.spec.width>job.spec.height?'landscape':'portrait'});
+  let pages=0;
+  for(let copy=0;copy<job.copies;copy++){
+   for(let y=0;y<total;y+=pageHeightPx){
+    const sliceHeight=Math.min(pageHeightPx,total-y);
+    const canvas=await window.html2canvas(doc.body,{scale:1.5,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',width:contentWidthPx,height:sliceHeight,x:0,y,scrollX:0,scrollY:0,windowWidth:contentWidthPx,windowHeight:Math.ceil(pageHeightPx),logging:false});
+    if(!canvas.width||!canvas.height)throw Error('No se ha podido renderizar el documento.');
+    if(pages++)pdf.addPage([job.spec.width,job.spec.height],job.spec.width>job.spec.height?'landscape':'portrait');
+    pdf.addImage(canvas.toDataURL('image/jpeg',0.9),'JPEG',job.spec.margin,job.spec.margin,job.spec.contentWidth,sliceHeight/mmToPx,undefined,'FAST');
+    canvas.width=canvas.height=1;
    }
-   if(!adminPrintAllowed()||job.owner!==currentSession?.user?.id)throw Error('Sesión finalizada');
-   job.pdfUrl=URL.createObjectURL(pdf.output('blob'));
-   return job.pdfUrl;
-  }finally{
-   frame.remove();
-   const visible=document.getElementById('adminPrintPreviewFrame');
-   if(activeAdminPrintJob()?.id===job.id)job.frame=visible;
   }
+  if(!adminPrintAllowed()||job.owner!==currentSession?.user?.id)throw Error('Sesión finalizada');
+  job.pdfUrl=URL.createObjectURL(pdf.output('blob'));
+  return job.pdfUrl;
  })().catch(e=>{job.pdfPromise=null;throw e});
  return job.pdfPromise;
 }
-async function openAdminDocumentPdf(){const job=activeAdminPrintJob();if(!job)return;const popup=window.open('','_blank');if(popup){popup.opener=null;popup.document.write('<p>Preparando PDF…</p>')}try{const url=await adminDocumentPdf(job);if(popup){popup.location.replace(url)}else{const a=document.createElement('a');a.href=url;a.target='_blank';a.textContent='Abrir PDF preparado';document.getElementById('adminPrintPreviewMessage').replaceChildren(a)}}catch(e){if(popup)popup.close();document.getElementById('adminPrintPreviewMessage').textContent='No se pudo generar el PDF: '+e.message}}
+async function openAdminDocumentPdf(){const job=activeAdminPrintJob();if(!job)return;const msg=document.getElementById('adminPrintPreviewMessage');msg.textContent='Preparando PDF…';try{const url=await adminDocumentPdf(job);const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.textContent='Abrir PDF preparado';msg.replaceChildren(a);a.click()}catch(e){msg.textContent='No se pudo generar el PDF: '+e.message}}
 async function downloadAdminDocumentPdf(){const job=activeAdminPrintJob();if(!job)return;const msg=document.getElementById('adminPrintPreviewMessage');msg.textContent='Preparando PDF…';try{const a=document.createElement('a');a.href=await adminDocumentPdf(job);a.download='parking-'+job.kind+'-'+job.id+'.pdf';document.body.appendChild(a);a.click();a.remove();msg.textContent='PDF preparado'+(job.copies===2?' con las 2 copias de la retirada.':'.')}catch(e){msg.textContent='No se pudo generar el PDF: '+e.message}}
 async function previewAdminCashbook(){if(!adminPrintAllowed())return;try{const id=opsEl('cashbookEmployee').value||parkingCashbookData?.shift_id;if(!id)throw Error('Selecciona el turno y el empleado.');const r=await db.rpc('parking_export_cashbook',{p_shift_id:id});if(r.error)throw r.error;await prepareAdminPrintPreview('cashbook',buildCashbookHtml(r.data))}catch(e){alert('No se pudo preparar la hoja de caja: '+e.message)}}
 
