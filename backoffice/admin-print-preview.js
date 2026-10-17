@@ -26,41 +26,58 @@ async function adminDocumentPdf(job){
  if(job.pdfUrl)return job.pdfUrl;
  if(job.pdfPromise)return job.pdfPromise;
  job.pdfPromise=(async()=>{
-  adminPdfStep('PDF: cargando bibliotecas…');
-  await adminPdfDeadline(loadAdminPreviewLibrary(),12000,'carga de bibliotecas');
-  if(!window.jspdf?.jsPDF||typeof window.html2canvas!=='function')throw Error('No se han cargado las bibliotecas del PDF.');
-  // Render the SAME visible iframe that the administrator already sees. A hidden,
-  // off-screen iframe can report zero layout dimensions on iPad Safari.
+  adminPdfStep('PDF: preparando documento…');
+  await adminPdfDeadline(loadParkingPdfLibraries(),12000,'bibliotecas PDF');
   const frame=document.getElementById('adminPrintPreviewFrame');
-  if(!frame||job.frame!==frame||!frame.contentDocument?.body)throw Error('Espera a que termine de cargar la previsualización.');
+  if(!frame||job.frame!==frame||!frame.contentDocument?.body)throw Error('Espera a que se muestre la previsualización.');
   const doc=frame.contentDocument;
-  adminPdfStep('PDF: preparando fuentes…');
-  if(doc.fonts?.ready)await adminPdfDeadline(doc.fonts.ready,3000,'fuentes');
-  await Promise.all(Array.from(doc.images,img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});setTimeout(resolve,2500)})));
-  adminPdfStep('PDF: calculando páginas…');
-  const mmToPx=96/25.4;
-  const contentWidthPx=Math.max(1,Math.ceil(job.spec.contentWidth*mmToPx));
-  const pageHeightPx=Math.max(1,Math.floor(job.spec.contentHeight*mmToPx));
-  const nodes=Array.from(doc.body.querySelectorAll('*'));
-  const rect=doc.body.getBoundingClientRect();
-  const deepest=Math.max(0,...nodes.map(el=>{const r=el.getBoundingClientRect();return Number.isFinite(r.bottom)?r.bottom-rect.top:0}));
-  const total=Math.ceil(Math.max(doc.documentElement.scrollHeight||0,doc.body.scrollHeight||0,doc.body.offsetHeight||0,rect.height||0,deepest));
-  if(!Number.isFinite(total)||total<1)throw Error('No se pudo medir el documento. Vuelve a abrir la previsualización.');
   const pdf=new window.jspdf.jsPDF({compress:true,unit:'mm',format:[job.spec.width,job.spec.height],orientation:job.spec.width>job.spec.height?'landscape':'portrait'});
-  let pages=0;
-  for(let copy=0;copy<job.copies;copy++){
-   for(let y=0;y<total;y+=pageHeightPx){
-    adminPdfStep('PDF: generando página '+(pages+1)+'…');
-    const sliceHeight=Math.min(pageHeightPx,total-y);
-    const canvas=await adminPdfDeadline(window.html2canvas(doc.body,{scale:1,useCORS:true,allowTaint:false,imageTimeout:3500,backgroundColor:'#ffffff',width:contentWidthPx,height:sliceHeight,x:0,y,scrollX:0,scrollY:0,windowWidth:contentWidthPx,windowHeight:Math.ceil(pageHeightPx),logging:false}),15000,'renderizado de página '+(pages+1));
-    if(!canvas.width||!canvas.height)throw Error('No se ha podido renderizar el documento.');
-    if(pages++)pdf.addPage([job.spec.width,job.spec.height],job.spec.width>job.spec.height?'landscape':'portrait');
-    pdf.addImage(canvas.toDataURL('image/jpeg',0.9),'JPEG',job.spec.margin,job.spec.margin,job.spec.contentWidth,sliceHeight/mmToPx,undefined,'FAST');
-    canvas.width=canvas.height=1;
+  // Draw from DOM text geometry, not html2canvas: html2canvas can hang indefinitely
+  // on Safari iPad while drawing the first page.
+  const origin=doc.body.getBoundingClientRect(),pxToMm=25.4/96,scale=job.spec.contentWidth/Math.max(1,origin.width);
+  const pagePx=job.spec.contentHeight/scale;
+  const entries=[];
+  const walker=doc.createTreeWalker(doc.body,NodeFilter.SHOW_TEXT);
+  let node;
+  while((node=walker.nextNode())){
+   if(!node.nodeValue.trim())continue;
+   const el=node.parentElement;
+   if(!el||el.closest('script,style,noscript'))continue;
+   const cs=doc.defaultView.getComputedStyle(el);
+   if(cs.display==='none'||cs.visibility==='hidden')continue;
+   const regex=/\\S+|\\s+/g;
+   let match;
+   while((match=regex.exec(node.nodeValue))){
+    if(!match[0].trim())continue;
+    const range=doc.createRange();
+    range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);
+    const rect=range.getBoundingClientRect();
+    if(!rect.width||!rect.height)continue;
+    const weight=parseInt(cs.fontWeight,10);
+    entries.push({text:match[0],x:rect.left-origin.left,y:rect.top-origin.top,h:rect.height,size:parseFloat(cs.fontSize)||13,bold:cs.fontWeight==='bold'||weight>=600,color:cs.color});
+   }
+  }
+  if(!entries.length)throw Error('No se pudo extraer el contenido visible del documento.');
+  const heightPx=Math.max(...entries.map(e=>e.y+e.h));
+  const pagesPerCopy=Math.max(1,Math.ceil(heightPx/pagePx));
+  const totalPages=pagesPerCopy*job.copies;
+  adminPdfStep('PDF: componiendo '+totalPages+' página(s)…');
+  for(let page=0;page<totalPages;page++){
+   if(page)pdf.addPage([job.spec.width,job.spec.height],job.spec.width>job.spec.height?'landscape':'portrait');
+   const part=page%pagesPerCopy,y0=part*pagePx;
+   for(const e of entries){
+    if(e.y+e.h<=y0||e.y>=y0+pagePx)continue;
+    const fontSize=Math.max(5,Math.min(28,e.size*72/96*scale));
+    pdf.setFont('helvetica',e.bold?'bold':'normal');
+    pdf.setFontSize(fontSize);
+    const rgb=e.color.match(/\\d+(?:\\.\\d+)?/g);
+    if(rgb?.length>=3)pdf.setTextColor(...rgb.slice(0,3).map(Number));else pdf.setTextColor(20,30,40);
+    const x=job.spec.margin+e.x*scale;
+    const y=job.spec.margin+(e.y-y0+e.h*.78)*scale;
+    if(x>=job.spec.margin-1&&x<=job.spec.width-job.spec.margin&&y>=0&&y<=job.spec.height)pdf.text(e.text,x,y);
    }
   }
   if(!adminPrintAllowed()||job.owner!==currentSession?.user?.id)throw Error('Sesión finalizada');
-  adminPdfStep('PDF: finalizando archivo…');
   job.pdfUrl=URL.createObjectURL(pdf.output('blob'));
   return job.pdfUrl;
  })().catch(e=>{job.pdfPromise=null;throw e});
