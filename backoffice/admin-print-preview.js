@@ -26,56 +26,61 @@ async function adminDocumentPdf(job){
  if(job.pdfUrl)return job.pdfUrl;
  if(job.pdfPromise)return job.pdfPromise;
  job.pdfPromise=(async()=>{
-  adminPdfStep('PDF: preparando documento…');
-  await adminPdfDeadline(loadParkingPdfLibraries(),12000,'bibliotecas PDF');
-  const frame=document.getElementById('adminPrintPreviewFrame');
-  if(!frame||job.frame!==frame||!frame.contentDocument?.body)throw Error('Espera a que se muestre la previsualización.');
-  const doc=frame.contentDocument;
+  adminPdfStep('PDF: cargando generador…');
+  await adminPdfDeadline(loadParkingPdfLibraries(),12000,'bibliotecas');
+  if(!window.jspdf?.jsPDF)throw Error('Generador PDF no disponible.');
+  const parsed=new DOMParser().parseFromString(job.html,'text/html');
+  parsed.querySelectorAll('script,style,head,noscript,iframe').forEach(el=>el.remove());
   const pdf=new window.jspdf.jsPDF({compress:true,unit:'mm',format:[job.spec.width,job.spec.height],orientation:job.spec.width>job.spec.height?'landscape':'portrait'});
-  // Draw from DOM text geometry, not html2canvas: html2canvas can hang indefinitely
-  // on Safari iPad while drawing the first page.
-  const origin=doc.body.getBoundingClientRect(),pxToMm=25.4/96,scale=job.spec.contentWidth/Math.max(1,origin.width);
-  const pagePx=job.spec.contentHeight/scale;
-  const entries=[];
-  const walker=doc.createTreeWalker(doc.body,NodeFilter.SHOW_TEXT);
-  let node;
-  while((node=walker.nextNode())){
-   if(!node.nodeValue.trim())continue;
-   const el=node.parentElement;
-   if(!el||el.closest('script,style,noscript'))continue;
-   const cs=doc.defaultView.getComputedStyle(el);
-   if(cs.display==='none'||cs.visibility==='hidden')continue;
-   const regex=/\\S+|\\s+/g;
-   let match;
-   while((match=regex.exec(node.nodeValue))){
-    if(!match[0].trim())continue;
-    const range=doc.createRange();
-    range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);
-    const rect=range.getBoundingClientRect();
-    if(!rect.width||!rect.height)continue;
-    const weight=parseInt(cs.fontWeight,10);
-    entries.push({text:match[0],x:rect.left-origin.left,y:rect.top-origin.top,h:rect.height,size:parseFloat(cs.fontSize)||13,bold:cs.fontWeight==='bold'||weight>=600,color:cs.color});
-   }
+  const margin=Math.max(7,job.spec.margin||0),width=job.spec.width-2*margin;
+  const rows=[];
+  const seen=new Set();
+  function add(text,bold=false){
+   text=String(text||'').replace(/\\s+/g,' ').trim();
+   if(text)rows.push({text,bold});
   }
-  if(!entries.length)throw Error('No se pudo extraer el contenido visible del documento.');
-  const heightPx=Math.max(...entries.map(e=>e.y+e.h));
-  const pagesPerCopy=Math.max(1,Math.ceil(heightPx/pagePx));
-  const totalPages=pagesPerCopy*job.copies;
-  adminPdfStep('PDF: componiendo '+totalPages+' página(s)…');
-  for(let page=0;page<totalPages;page++){
-   if(page)pdf.addPage([job.spec.width,job.spec.height],job.spec.width>job.spec.height?'landscape':'portrait');
-   const part=page%pagesPerCopy,y0=part*pagePx;
-   for(const e of entries){
-    if(e.y+e.h<=y0||e.y>=y0+pagePx)continue;
-    const fontSize=Math.max(5,Math.min(28,e.size*72/96*scale));
-    pdf.setFont('helvetica',e.bold?'bold':'normal');
-    pdf.setFontSize(fontSize);
-    const rgb=e.color.match(/\\d+(?:\\.\\d+)?/g);
-    if(rgb?.length>=3)pdf.setTextColor(...rgb.slice(0,3).map(Number));else pdf.setTextColor(20,30,40);
-    const x=job.spec.margin+e.x*scale;
-    const y=job.spec.margin+(e.y-y0+e.h*.78)*scale;
-    if(x>=job.spec.margin-1&&x<=job.spec.width-job.spec.margin&&y>=0&&y<=job.spec.height)pdf.text(e.text,x,y);
+  // Extract semantic blocks directly from HTML; does not use Safari layout,
+  // canvases, ranges, or hidden frames.
+  const root=parsed.body;
+  function walk(el){
+   if(!el||el.nodeType!==1)return;
+   const tag=el.tagName.toLowerCase();
+   if(['script','style','svg','img','button','input'].includes(tag))return;
+   if(tag==='tr'){
+    const cells=Array.from(el.children).filter(c=>/^(TD|TH)$/.test(c.tagName));
+    const values=cells.map(c=>c.textContent.replace(/\\s+/g,' ').trim()).filter(Boolean);
+    if(values.length)add(values.join('     '),cells.some(c=>c.tagName==='TH'));
+    return;
    }
+   if(['h1','h2','h3','h4','p','li','dt','dd'].includes(tag)){
+    add(el.textContent,/^h[1-4]$/.test(tag));return;
+   }
+   const kids=Array.from(el.children).filter(c=>!['STYLE','SCRIPT','NOSCRIPT'].includes(c.tagName));
+   if(!kids.length){if(!el.closest('table'))add(el.textContent);return}
+   for(const child of kids)walk(child);
+  }
+  walk(root);
+  if(!rows.length){
+   const fallback=root.textContent.replace(/\\s+/g,' ').trim();
+   if(fallback)add(fallback);
+  }
+  if(!rows.length)throw Error('El HTML de origen no contiene texto para el PDF.');
+  adminPdfStep('PDF: componiendo documento…');
+  const lineHeight=5.4,top=Math.max(11,margin),bottom=job.spec.height-margin;
+  const startCopy=()=>{let y=top;return function(row){
+   pdf.setFont('helvetica',row.bold?'bold':'normal');
+   pdf.setFontSize(row.bold?11:9);
+   const wrapped=pdf.splitTextToSize(row.text,width);
+   for(const line of wrapped){
+    if(y+lineHeight>bottom){pdf.addPage([job.spec.width,job.spec.height],job.spec.width>job.spec.height?'landscape':'portrait');y=top}
+    pdf.text(line,margin,y);y+=lineHeight;
+   }
+   y+=row.bold?2:0;
+  }};
+  for(let copy=0;copy<job.copies;copy++){
+   if(copy)pdf.addPage([job.spec.width,job.spec.height],job.spec.width>job.spec.height?'landscape':'portrait');
+   const write=startCopy();
+   for(const row of rows)write(row);
   }
   if(!adminPrintAllowed()||job.owner!==currentSession?.user?.id)throw Error('Sesión finalizada');
   job.pdfUrl=URL.createObjectURL(pdf.output('blob'));
