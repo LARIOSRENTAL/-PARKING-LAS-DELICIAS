@@ -470,7 +470,7 @@ function activeTotalStayRows(){
   if(x.reservation_id&&reservations.some(r=>r.id===x.reservation_id&&['cancelled','expired','completed'].includes(r.status)))continue;
   byId.set(x.reservation_id||x.id,{reference:reservations.find(r=>r.id===x.reservation_id)?.reference||'—',spot:x.parking_spots?.code||spots.find(s=>s.id===x.spot_id)?.code||'—',plate:x.plate||'—',vehicle:x.vehicle_make_model||'',customer:x.customer_name||'—',phone:x.customer_phone||'',start:x.actual_entry_at||x.planned_entry_at,end:x.planned_exit_at,presence:'DENTRO'});
  }
- return [...byId.values()].sort((a,b)=>String(a.spot).localeCompare(String(b.spot),'es',{numeric:true})||new Date(a.end)-new Date(b.end));
+ return [...byId.values()].sort((a,b)=>(new Date(a.end)-new Date(b.end))||String(a.spot).localeCompare(String(b.spot),'es',{numeric:true}));
 }
 function renderTotalStays(){
  const el=document.getElementById('totalStaysBody');if(!el)return;
@@ -594,7 +594,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="hotel-vouchers.js?v=voucher-enter-20261016"></script>
 <script src="bank-invoice-mail.js?v=subscriber-method-20261017"></script>
 <script src="hotel-payments.js?v=available-20261017-pending-20261016"></script>
-<script src="stay-completion.js?v=manual-finish-20261016"></script>
+<script src="stay-completion.js?v=end-order-20261017"></script>
 <script src="staff-users.js?v=access-20261017-users-20261016"></script>
 <script src="rotation-spots.js?v=available-dropdown-20261016"></script>
 <script src="print-profiles.js?v=cashbook-20261017-dedicated-cash-queue-20261016"></script>
