@@ -75,7 +75,7 @@ async function loadSpots(){
  if(stateFilter&&stateFilter!==state)continue;if(classFilter&&s.spot_class!==classFilter)continue;
  const cls=state==='LIBRE'?'free':state==='FIJO'?'fixed':['OCUPADO','BLOQUEADA'].includes(state)?'blocked':state==='DENTRO'?'busy':'reservedOut';
  const holders=fixedSpotAssignments.filter(x=>x.spot_id===s.id);
- const detail=holders.map(x=>'<div><b>'+esc(x.customer_name)+'</b><br>'+esc(x.plate)+'</div>').join('')+(s.inventory_state==='fixed'&&!holders.length?'<p>Titular pendiente de identificar.</p>':'')+assigned.map(r=>'<div><b>'+esc(r.plate||r.reference)+'</b><br><small>'+fmt(r.entry_at)+' → '+fmt(r.exit_at)+'</small></div>').join('')+(u?'<div>'+esc(u.plate)+'</div>':'');
+ const detail=parkingSpotOperationDetails(s,holders,assigned,u);
  const actions=canManageRates()&&s.inventory_state!=='legacy'?`<button class="mini" onclick="document.getElementById('parkingSpotDialog').close();editInventoryState('${s.id}')">Estado</button>${state==='LIBRE'||state==='BLOQUEADA'?`<button class="mini" onclick="document.getElementById('parkingSpotDialog').close();toggleSpotBlock('${s.id}')">${b?'Desbloquear':'Bloquear por fechas'}</button>`:''}`:'';
  parkingPlanDetails.set(s.id,{spot:s,state,detail,actions});
  const title=s.code+' · '+state+' · '+s.spot_class+(holders.length?' · '+holders.map(x=>x.customer_name+' · '+x.plate).join(' / '):'');

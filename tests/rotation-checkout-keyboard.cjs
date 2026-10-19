@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),vm=require('vm');
+const root=path.resolve(__dirname,'..'),source=fs.readFileSync(path.join(root,'backoffice/operations.js'),'utf8'),html=fs.readFileSync(path.join(root,'backoffice/index.html'),'utf8');
+let handler,calls=0,release;
+const nodes={};const node=id=>nodes[id]||(nodes[id]={value:'0',disabled:false,checked:false,tagName:'INPUT',classList:{contains:()=>false},contains:el=>el?.inCheckout,focus(){}});
+node('rotCheckoutConfirm').tagName='BUTTON';node('rotCheckoutConfirm').inCheckout=true;node('rotCheckoutPayment').value='cash';
+const ctx={document:{addEventListener:(_name,fn)=>handler=fn},opsEl:node,rotationCheckoutBusy:false,currentRotationSession:{id:'active'},rotationFreeHoursPending:false,rotationFreeHoursInvalid:false,rotationCheckoutInvoiceCustomer:null,confirm:()=>{throw Error('No second confirmation dialog')},money:n=>n,alert(){},closeRotationCheckout(){},clearRotationDisplay(){ctx.currentRotationSession=null},refreshAll:async()=>{},showParkingInvoicePreview(){},db:{rpc:async()=>{calls++;await new Promise(r=>release=r);return{data:{session:{amount_eur:0}}}}}};
+vm.createContext(ctx);vm.runInContext(source.split('\n').find(l=>l.startsWith('async function confirmRotationCheckout(')),ctx);vm.runInContext(source.split('\n').find(l=>l.startsWith('(function installRotationCheckoutKeyboard()')),ctx);
+const event=(target=node('rotCheckoutConfirm'),extra={})=>({key:'Enter',target,preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true},...extra});
+(async()=>{
+ handler(event(node('rotCheckoutConfirm'),{repeat:true}));assert.equal(calls,0);
+ handler(event({tagName:'BUTTON',inCheckout:true}));assert.equal(calls,0);
+ handler(event({tagName:'INPUT',inCheckout:false}));assert.equal(calls,0);
+ handler(event({tagName:'TEXTAREA',inCheckout:true}));assert.equal(calls,0);
+ node('rotCheckoutConfirm').disabled=true;handler(event());assert.equal(calls,0);node('rotCheckoutConfirm').disabled=false;
+ const press=event();handler(press);assert(press.prevented&&press.stopped);assert.equal(calls,1);assert.equal(node('rotCheckoutConfirm').disabled,true);
+ handler(event());assert.equal(calls,1);release();await new Promise(r=>setImmediate(r));assert.equal(ctx.currentRotationSession,null);
+ ctx.currentRotationSession={id:'pending'};ctx.rotationFreeHoursPending=true;handler(event({tagName:'INPUT',inCheckout:true}));assert.equal(calls,1);
+ const choose=html.split('\n').find(l=>l.startsWith('async function chooseRotationPlate('));let focused=false;
+ const choiceCtx={rotPlate:{value:'',focus(){focused=true}},hideRotationMatches(){},rotationLookupPlate:async()=>({id:'active'})};vm.createContext(choiceCtx);vm.runInContext(choose,choiceCtx);await choiceCtx.chooseRotationPlate('1234ABC');assert.equal(focused,true);
+ assert(source.includes("opsEl('rotCheckoutConfirm').focus()"));
+ console.log('Cobro por Intro: selección conserva foco, apertura sin cobro, confirmación directa única, repetición bloqueada, botones secundarios y formulario de factura protegidos.');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -6,13 +6,14 @@ let fixedSpotAssignments=[],parkingPlanZone='J',parkingPlanDetails=new Map();
 function parkingMapPosition(zone,code){
  const n=Number(code.match(/\d+$/)?.[0]);let x,y,w=12,h=3.5;
  if(zone==='J'){
-  if(n<=4){x=(4-n)*13;y=0;w=12;h=5}
-  else if(n<=28){x=0;y=6+(n-5)*3.8}
-  else if(n<=38){x=87;y=48+(38-n)*4.6;h=4.3}
-  else if(n<=42){x=87;y=4+(42-n)*5;h=4.6}
+  if(n<=4){x=(4-n)*20;y=0;w=19;h=5.4}
+  else if(n<=28){x=0;y=6+(n-5)*5.8;w=19;h=5.4}
+  else if(n<=38){x=80;y=48+(38-n)*5.8;w=19;h=5.4}
+  else if(n<=42){x=80;y=4+(42-n)*5.8;w=19;h=5.4}
   else if(n<=46){x=32+(46-n)*10;y=30;w=9;h=8}
   else if(n<=54){x=32;y=39+(n-47)*5.8;w=19;h=5.4}
   else{x=52;y=39+(62-n)*5.8;w=19;h=5.4}
+  y/=1.5;h/=1.5;
  }else if(zone==='C'){
   w=15;h=7;
   if(n<=6){x=0;y=(n-2)*8}
@@ -47,5 +48,17 @@ function openParkingSpotDetail(id){
  dialog.showModal();
 }
 
-function sizeParkingMap(){const map=document.querySelector('.planGroup:not([hidden]) .parkingMap');if(map)map.style.height=Math.max(360,window.innerHeight-map.getBoundingClientRect().top-24)+'px'}
+function sizeParkingMap(){const map=document.querySelector('.planGroup:not([hidden]) .parkingMap');if(map)map.style.height=Math.max(parkingPlanZone==='J'?960:360,window.innerHeight-map.getBoundingClientRect().top-24)+'px'}
 window.addEventListener('resize',sizeParkingMap);
+
+function parkingSpotOperationDetails(spot,holders,assigned,session){
+ let detail=holders.map(x=>'<div class="spotOperation"><b>Abonado</b><br>'+esc(x.customer_name)+'<br>Matrícula: <strong>'+esc(x.plate||'Sin matrícula')+'</strong></div>').join('');
+ if(spot.inventory_state==='fixed'&&!holders.length)detail+='<p><b>Abonado</b> · Titular pendiente de identificar.</p>';
+ detail+=assigned.map(r=>'<div class="spotOperation"><b>Estancia</b><br>Matrícula: <strong>'+esc(r.plate||'Sin matrícula')+'</strong><br>Fin previsto: <strong>'+fmt(r.exit_at)+'</strong><br><small>Entrada: '+fmt(r.entry_at)+'</small></div>').join('');
+ if(session&&!assigned.some(r=>r.id===session.reservation_id)){
+  const stay=!!session.reservation_id||!!session.planned_exit_at;
+  detail+='<div class="spotOperation"><b>'+(stay?'Estancia':'Rotación')+'</b><br>Matrícula: <strong>'+esc(session.plate||'Sin matrícula')+'</strong>'+(stay?'<br>Fin previsto: <strong>'+fmt(session.planned_exit_at)+'</strong>':'')+'<br><small>Entrada: '+fmt(session.actual_entry_at||session.entry_at)+'</small></div>';
+ }
+ if(!detail&&spot.inventory_state==='blocked')detail='<p>Plaza ocupada / bloqueada. No hay una operación identificada.</p>';
+ return detail;
+}
