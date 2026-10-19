@@ -36,14 +36,14 @@ function initialCashbookShift(){const d=new Date(),parts=new Intl.DateTimeFormat
 let cashbookLoadVersion=0,parkingCashbookPrintedData=null;
 async function loadCashbook(){
  const version=++cashbookLoadVersion,privileged=['admin','manager'].includes(currentProfile?.role),fallback=initialCashbookShift(),dateNode=opsEl('cashbookDate'),codeNode=opsEl('cashbookShift'),employeeNode=opsEl('cashbookEmployee');
- if(!dateNode.value){dateNode.value=currentShift?.shift_date||fallback.date;codeNode.value=currentShift?.shift_code||fallback.code}
+ if(!privileged&&currentShift?.id){dateNode.value=currentShift.shift_date;codeNode.value=String(currentShift.shift_code)}else if(!dateNode.value){dateNode.value=currentShift?.shift_date||fallback.date;codeNode.value=currentShift?.shift_code||fallback.code}
  dateNode.disabled=!privileged;codeNode.disabled=!privileged;employeeNode.disabled=!privileged;
  try{
  const list=await db.rpc('parking_cashbook_shifts',{p_date:dateNode.value,p_shift_code:Number(codeNode.value)});if(version!==cashbookLoadVersion)return;if(list.error)throw list.error;
  const shifts=list.data||[],old=employeeNode.value;employeeNode.innerHTML=shifts.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.employee_name)+(s.closed_at?' · cerrado':' · abierto')+'</option>').join('');
- const selected=shifts.find(s=>s.id===old)||shifts.find(s=>s.id===currentShift?.id)||shifts[0];if(!selected){parkingCashbookData=null;opsEl('cashbookBody').textContent='No hay turnos registrados para esta selección.';renderCashbookPanel(null);return}employeeNode.value=selected.id;
+ const selected=privileged?(shifts.find(s=>s.id===old)||shifts.find(s=>s.id===currentShift?.id)||shifts[0]):shifts.find(s=>s.id===currentShift?.id);if(!selected){parkingCashbookData=null;opsEl('cashbookBody').textContent='No hay turnos registrados para esta selección.';renderCashbookPanel(null);return}employeeNode.value=selected.id;
  const r=await db.rpc('parking_cashbook',{p_date:dateNode.value,p_shift_code:Number(codeNode.value),p_shift_id:selected.id});if(version!==cashbookLoadVersion)return;if(r.error)throw r.error;
- const vouchers=await db.rpc('parking_active_cash_vouchers');if(version!==cashbookLoadVersion)return;if(vouchers.error)throw vouchers.error;activeCashVouchers=vouchers.data;parkingCashbookData=r.data;opsEl('cashbookBody').innerHTML=renderCashbook(r.data);renderCashbookPanel(r.data);
+ const vouchers=await db.rpc('parking_active_cash_vouchers');if(version!==cashbookLoadVersion)return;activeCashVouchers=vouchers.error?null:vouchers.data;parkingCashbookData=r.data;opsEl('cashbookBody').innerHTML=renderCashbook(r.data);renderCashbookPanel(r.data);if(vouchers.error)opsEl('cashValeMessage').textContent='No se pudo actualizar el listado de vales: '+vouchers.error.message;
  }catch(e){if(version!==cashbookLoadVersion)return;parkingCashbookData=null;opsEl('cashbookBody').textContent=e.message;renderCashbookPanel(null)}
 }
 function cashbookTotals(rows){const result={subscriber:0,stay:0,rotation:0,card:0,cash:0,bank:0,online:0,total:0};for(const r of rows){const amount=Number(r.amount_eur||0);result[r.category]=(result[r.category]||0)+amount;result[r.payment_method]=(result[r.payment_method]||0)+amount;result.total+=amount}return result}

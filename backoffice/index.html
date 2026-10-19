@@ -119,29 +119,35 @@ async function chooseManagerAccess(mode){
 async function cancelManagerAccess(){managerAccessModal.classList.add('hidden');sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()}
 async function logout(){sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload()}
 let closingShift=false;
+function cashbookCanCarryForward(report){
+ const s=report.cash_state||{},amounts=['opening_balance','loose_coins','wrapped_coins','banknotes','vouchers','counted_total','expected_balance','difference'];
+ return s.saved===false&&Array.isArray(report.rows)&&report.rows.length===0&&!(report.withdrawals||[]).length&&!(s.entries||[]).length&&!(s.voucher_returns||[]).some(r=>r.shift_id===report.shift_id)&&['cash_income','expense_total','withdrawal_total','voucher_total'].every(k=>Number(s[k]||0)===0)&&amounts.every(k=>s[k]!==null&&s[k]!==undefined&&Number.isFinite(Number(s[k])))&&Math.abs(Number(s.difference))<0.001&&Math.abs(Number(s.counted_total)-Number(s.expected_balance))<0.001;
+}
+async function readClosingCashbook(shift){const r=await db.rpc('parking_cashbook',{p_date:shift.shift_date,p_shift_code:Number(shift.shift_code),p_shift_id:shift.id});if(r.error||!r.data||r.data.shift_id!==shift.id)throw Error('No se pudo recuperar la hoja de caja: '+(r.error?.message||'Turno no identificado'));return r.data}
 async function closeShiftAndLogout(){
  if(closingShift)return;
  if(currentAccessMode==='free'||!currentShift)return logout();
- closingShift=true;
- const button=document.getElementById('shiftActionBtn');if(button)button.disabled=true;
+ closingShift=true;const button=document.getElementById('shiftActionBtn');if(button)button.disabled=true;
  try{
   const shift={...currentShift};
-  if(typeof cashCountDirty!=='undefined'&&cashCountDirty&&typeof saveCashCount==='function'){
-   if(!await saveCashCount(true))throw Error('Guarda el arqueo antes de cerrar.');
+  if(typeof cashCountDirty!=='undefined'&&cashCountDirty&&cashCountShiftId===shift.id&&typeof saveCashCount==='function'){
+   if(typeof ownCashbookShift==='function'&&!ownCashbookShift()){parkingCashbookData=await readClosingCashbook(shift);if(typeof renderCashbookPanel==='function')renderCashbookPanel(parkingCashbookData)}
+   if(!await saveCashCount(true))throw Error('No se pudo guardar el arqueo. Revisa el Resumen de caja antes de cerrar.');
   }
-  const q=await db.rpc('parking_cashbook',{p_date:shift.shift_date,p_shift_code:Number(shift.shift_code),p_shift_id:shift.id});
-  if(q.error||!q.data||q.data.shift_id!==shift.id)throw Error('No se pudo recuperar la hoja de caja: '+(q.error?.message||'Turno no identificado'));
-  const report=q.data,cs=report.cash_state||{};
-  if(!cs.saved)throw Error('Guarda el arqueo con el dinero real antes de cerrar.');
-  const diff=Number(cs.difference||0);
-  const warning=Math.abs(diff)>0.001?'\\nDescuadre registrado: '+money(diff)+'. Se conserva el dinero real y los movimientos sin alterar.':'';
-  if(!confirm('¿Cerrar turno '+shift.shift_code+' con saldo contado de '+money(Number(cs.counted_total||0))+'?'+warning+'\\nLa impresión no impedirá el cierre.'))return;
+  let report=await readClosingCashbook(shift);const cs=report.cash_state||{},carry=cashbookCanCarryForward(report);
+  if(!cs.saved&&!carry){showArea('cashbook');if(typeof showCashbookTab==='function')showCashbookTab('count');await loadCashbook();throw Error('Revisa y guarda el dinero contado en el Resumen de caja antes de cerrar.');}
+  const diff=Number(cs.difference||0),warning=Math.abs(diff)>0.001?'\nDescuadre registrado: '+money(diff)+'. Se conservarán los importes reales.':'';
+  const intro=carry?'Turno sin movimientos. Se conservará el saldo recibido del turno anterior.\n':'';
+  if(!confirm(intro+'¿Cerrar turno '+shift.shift_code+' con saldo de caja de '+money(Number(cs.counted_total||0))+'?'+warning+'\nLa impresión no impedirá el cierre.'))return;
+  if(carry){
+   const values={};for(const k of ['opening_balance','loose_coins','wrapped_coins','banknotes','vouchers'])values[k]=Number(cs[k]).toFixed(2);values.denomination_breakdown=cs.denomination_breakdown||{};
+   const saved=await db.rpc('parking_save_cash_count',{p_shift_id:shift.id,p_values:values});if(saved.error)throw Error('No se pudo guardar el saldo recibido: '+saved.error.message);
+   report=await readClosingCashbook(shift);if(!report.cash_state?.saved)throw Error('No se pudo confirmar el arqueo guardado. Vuelve a intentarlo.');if(!cashbookCanCarryForward({...report,cash_state:{...report.cash_state,saved:false}}))throw Error('La caja ha cambiado durante la confirmación. Revisa el Resumen de caja antes de cerrar.');
+  }
   try{await Promise.race([sendParkingPrint('cashbook',buildCashbookHtml(report)),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora no responde')),5000))]);}catch(printError){console.warn('Impresión fallida, cierre continúa',printError);}
-  const res=await db.rpc('parking_close_cash_shift',{p_shift_id:shift.id,p_expected:report});
-  if(res.error)throw Error('No se pudo cerrar el turno: '+res.error.message);
+  const res=await db.rpc('parking_close_cash_shift',{p_shift_id:shift.id,p_expected:report});if(res.error)throw Error('No se pudo cerrar el turno: '+res.error.message);
   sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload();
- }catch(e){alert(e.message)}
- finally{closingShift=false;if(button)button.disabled=false}
+ }catch(e){alert(e.message)}finally{closingShift=false;if(button)button.disabled=false}
 }
 async function startManagerShiftFromFree(){
   if(currentProfile?.role!=='manager'||currentAccessMode!=='free')return;
@@ -602,7 +608,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="assets/jsbarcode-code128.min.js"></script>
 <script src="parking-layout.js?v=checkout-cages-20261019"></script>
 <script src="rates-planning.js?v=spot-detail-20261019-20261019a-web-20261017-real-spots-20261016"></script>
-<script src="operations.js?v=keyboard-checkout-20261019"></script>
+<script src="operations.js?v=cash-close-empty-20261019"></script>
 <script src="blacklist.js?v=20261015"></script>
 <script src="hotel-vouchers.js?v=stay-flow-20261019-conversion-print-20261019-voucher-enter-20261016"></script>
 <script src="bank-invoice-mail.js?v=subscriber-method-20261017"></script>
@@ -612,7 +618,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="rotation-spots.js?v=all-spots-20261019"></script>
 <script src="print-profiles.js?v=cashbook-20261017-dedicated-cash-queue-20261016"></script>
 <script src="cash-withdrawals.js?v=admin-preview-20261017"></script>
-<script src="cashbook-panel.js?v=denominations-20261019-admin-preview-20261017"></script>
+<script src="cashbook-panel.js?v=own-shift-guard-20261019"></script>
 <script src="subscriber-deadlines.js?v=20261019a"></script>
 <script src="billing-exports.js?v=admin-billing-20261019-search-20261017-billing-20261017"></script>
 <script src="admin-print-preview.js?v=20261017-source-pdf-6"></script><datalist id="subscriberSpotChoices"></datalist>
