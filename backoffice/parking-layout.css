@@ -8,3 +8,5 @@
 @media(max-width:600px){#rotationCheckoutModal .checkoutFields{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#rotationCheckoutModal .checkoutSummary{grid-template-columns:1fr}#rotationCheckoutModal .checkoutFooter .actions{width:100%}#rotationCheckoutModal .btn{padding:10px;font-size:13px}}
 
 .planGroup[data-plan-zone="J"] .mapOffice{top:22%;width:19%}.planGroup[data-plan-zone="J"] .mapAisle{left:22%}
+
+.parkingMap .spot strong{font-size:13px}@media(max-width:800px){.parkingMap .spot strong{font-size:13px}}.clientData{margin:10px 0 14px}.clientData summary{cursor:pointer;font-weight:700;padding:8px 0}.stayEditSummary{padding:10px;background:#eef6f3;border-radius:8px;margin:10px 0;font-weight:700}.stayEditFields .field{margin-bottom:8px}.stayEditFields input,.stayEditFields select{min-width:0}
