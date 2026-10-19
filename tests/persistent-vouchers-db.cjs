@@ -37,6 +37,12 @@ const next=await one('insert into staff_shifts(user_id,shift_code,shift_date)val
 
 // Introduce the feature over existing persisted/closed records, not an empty schema.
 await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016234206_persistent_cash_vouchers.sql'),'utf8'));
+await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261019131259_cash_count_denominations.sql'),'utf8'));
+
+const parts={loose_coins:{'1':'50.00',unallocated:'0.00'},wrapped_coins:{'2':'200.00',unallocated:'0.00'},banknotes:{'50':'700.00',unallocated:'0.00'}};
+const detailed=await one('select parking_save_cash_count($1,$2)',[next,JSON.stringify({opening_balance:'970',loose_coins:'50',wrapped_coins:'200',banknotes:'700',vouchers:'999',denomination_breakdown:parts})]);
+assert.deepEqual(detailed.denomination_breakdown,parts);assert.equal(Number(detailed.counted_total),970);
+await assert.rejects(()=>one('select parking_save_cash_count($1,$2)',[next,JSON.stringify({opening_balance:'970',loose_coins:'51',wrapped_coins:'200',banknotes:'700',vouchers:'0',denomination_breakdown:parts})]),/no coincide/);
 const cancel=(id=vale.id,shiftId=next)=>one('select parking_cancel_cash_voucher($1,$2)',[id,shiftId]);
 await q('set role authenticated');
 assert.equal((await one('select parking_active_cash_vouchers()')).rows[0].id,vale.id);
