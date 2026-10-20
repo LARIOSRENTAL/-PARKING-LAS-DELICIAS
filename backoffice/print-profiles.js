@@ -6,10 +6,10 @@ const PARKING_STAY_PRINT_PROFILE=Object.freeze({
  size:Object.freeze({width:100,height:210,custom:true})
 });
 function parkingStayPrintConfig(){return {...PARKING_STAY_PRINT_PROFILE,size:{...PARKING_STAY_PRINT_PROFILE.size}}}
-// HOJA DE CAJA: A4 horizontal, bandeja 1. Options apply only to this job.
-function parkingCashbookPrintConfig(tray){if(typeof tray!=='string'||!tray.trim())throw new Error('No se ha identificado la bandeja 1 de la Ricoh.');return {
- copies:1,color:false,units:'mm',orientation:'landscape',rotation:0,
- size:{width:210,height:297},printerTray:tray,jobName:'HOJA DE CAJA · A4 · BANDEJA 1',margins:6,
+// Summary uses A5 portrait; cash receipts keep their A4 landscape layout.
+function parkingCashbookPrintConfig(tray,kind='cashbook'){if(typeof tray!=='string'||!tray.trim())throw new Error('No se ha identificado la bandeja 1 de la Ricoh.');return {
+ copies:1,color:false,units:'mm',orientation:kind==='cashbook'?'portrait':'landscape',rotation:0,
+ size:kind==='cashbook'?{width:148,height:210}:{width:210,height:297},printerTray:tray,jobName:'HOJA DE CAJA · A5 · BANDEJA 1',margins:6,
  scaleContent:true,rasterize:true
 }}
 function parkingCashbookTrayName(printer){
@@ -29,11 +29,12 @@ function parkingCashbookTrayName(printer){
 async function parkingCashbookPrintConfigForPrinter(target,kind='cashbook'){
  const details=await qz.printers.details(),printers=Array.isArray(details)?details:[details],printer=printers.find(p=>p?.name===target);
  if(!printer)throw new Error('No se pudieron consultar las bandejas de '+target+'.');
- const config=parkingCashbookPrintConfig(parkingCashbookTrayName(printer));if(kind==='withdrawal'){config.copies=2;config.jobName='RETIRADA DE EFECTIVO · 2 COPIAS · BANDEJA 1'}if(kind==='cashvale'){config.jobName='VALE DE EFECTIVO · 1 COPIA · BANDEJA 1'}if(kind==='cashexpense'){config.jobName='RECIBO DE GASTO · 1 COPIA · BANDEJA 1'}return config
+ const config=parkingCashbookPrintConfig(parkingCashbookTrayName(printer),kind);if(kind==='withdrawal'){config.copies=2;config.jobName='RETIRADA DE EFECTIVO · 2 COPIAS · BANDEJA 1'}if(kind==='cashvale'){config.jobName='VALE DE EFECTIVO · 1 COPIA · BANDEJA 1'}if(kind==='cashexpense'){config.jobName='RECIBO DE GASTO · 1 COPIA · BANDEJA 1'}return config
 }
 function parkingHtmlPrintData(kind,html){
  const data={type:'pixel',format:'html',flavor:'plain',data:html};
  if(kind==='stay')data.options={pageWidth:100,pageHeight:210};
- if(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')data.options={pageWidth:285,pageHeight:198};
+ if(kind==='cashbook')data.options={pageWidth:136,pageHeight:198};
+ if(kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')data.options={pageWidth:285,pageHeight:198};
  return data;
 }
