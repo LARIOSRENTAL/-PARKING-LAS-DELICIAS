@@ -31,8 +31,12 @@ async function parkingCashbookPrintConfigForPrinter(target,kind='cashbook'){
  if(!printer)throw new Error('No se pudieron consultar las bandejas de '+target+'.');
  const config=parkingCashbookPrintConfig(parkingCashbookTrayName(printer),kind);if(kind==='withdrawal'){config.copies=2;config.jobName='RETIRADA DE EFECTIVO · 2 COPIAS · BANDEJA 1'}if(kind==='cashvale'){config.jobName='VALE DE EFECTIVO · 1 COPIA · BANDEJA 1'}if(kind==='cashexpense'){config.jobName='RECIBO DE GASTO · 1 COPIA · BANDEJA 1'}return config
 }
+// Only entry tickets use the compact format; payment receipts keep their profile.
+function parkingRotationEntryPageHeight(html){if(!html.includes('data-parking-ticket="rotation-entry"'))return null;const height=Number(html.match(/@page\s*\{\s*size\s*:\s*80mm\s+([\d.]+)mm/i)?.[1]);if(!Number.isFinite(height)||height<140)throw new Error('El ticket de entrada no declara un tamaño válido.');return height}
+function parkingThermalPrintConfig(html){return {copies:1,color:false,size:{width:80,height:parkingRotationEntryPageHeight(html)||200},units:'mm',orientation:'portrait',margins:0}}
 function parkingHtmlPrintData(kind,html){
  const data={type:'pixel',format:'html',flavor:'plain',data:html};
+ if(kind==='ticket'&&parkingRotationEntryPageHeight(html))data.options={pageWidth:80,pageHeight:parkingRotationEntryPageHeight(html)};
  if(kind==='stay')data.options={pageWidth:100,pageHeight:210};
  if(kind==='cashbook')data.options={pageWidth:285,pageHeight:198};
  if(kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')data.options={pageWidth:285,pageHeight:198};

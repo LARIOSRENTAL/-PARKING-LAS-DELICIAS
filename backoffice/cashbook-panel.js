@@ -13,7 +13,7 @@ function renderCashDenominationInputs(state,own){
  cashDenominationDraft={};
  for(const [group,title]of [['loose_coins','MONEDAS SUELTAS'],['wrapped_coins','MONEDAS EMPAQUETADAS'],['banknotes','BILLETES']]){
   const defs=cashDenominations(group),values=cashBreakdownGroup(state,group);cashDenominationDraft[group]=values;
-  opsEl('cashDenominations_'+group).innerHTML='<fieldset class="cashDenominationBlock"><legend>'+title+'</legend><table><thead><tr>'+defs.map(([,label])=>'<th>'+esc(label)+'</th>').join('')+'</tr></thead><tbody><tr>'+defs.map(([key,label])=>'<td><input id="cashDenom_'+group+'_'+key+'" aria-label="'+title+' '+esc(label)+' (importe en euros)" inputmode="decimal" oninput="cashDenominationChanged(\''+group+'\')"></td>').join('')+'</tr></tbody></table><p id="cashInheritedHint_'+group+'" class="muted" '+(values.unallocated?'':'hidden')+'>Recuento anterior pendiente de desglosar. Al rellenar estas casillas se sustituye por su suma.</p></fieldset>';
+  opsEl('cashDenominations_'+group).innerHTML='<fieldset class="cashDenominationBlock"><legend>'+title+'</legend><table><thead><tr>'+defs.map(([,label])=>'<th>'+esc(label)+'</th>').join('')+'</tr></thead><tbody><tr>'+defs.map(([key,label])=>'<td><input id="cashDenom_'+group+'_'+key+'" aria-label="'+title+' '+esc(label)+' (importe en euros)" inputmode="decimal" draggable="false" oninput="cashDenominationChanged(\''+group+'\')"></td>').join('')+'</tr></tbody></table><p id="cashInheritedHint_'+group+'" class="muted" '+(values.unallocated?'':'hidden')+'>Recuento anterior pendiente de desglosar. Al rellenar estas casillas se sustituye por su suma.</p></fieldset>';
   for(const [key]of defs){const input=opsEl('cashDenom_'+group+'_'+key);input.value=Number(values[key]).toFixed(2);input.disabled=!own}
  }
 }
@@ -138,3 +138,5 @@ async function cancelLegacyCashVale(){
  }catch(e){if(!cashEntryPending.legacyVoucherReturn){try{await loadCashbook()}catch(refreshError){}}opsEl('cashValeMessage').textContent='No se pudo confirmar la devolución: '+e.message+(cashEntryPending.legacyVoucherReturn?'. Reintenta para confirmar la misma operación sin duplicarla.':'. Revisa los vales pendientes actualizados.')}
  finally{cashValeCancelBusy=false;renderCashbookPanel(parkingCashbookData)}
 }
+
+function blockCashCountDrag(event){if(event.target?.closest?.('[id^="cashDenom_"]')){event.preventDefault();if(event.dataTransfer)event.dataTransfer.dropEffect='none'}}
