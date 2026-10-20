@@ -42,6 +42,7 @@ let cashbookLoadVersion=0,parkingCashbookPrintedData=null;
 async function loadCashbook(){
  const version=++cashbookLoadVersion,privileged=['admin','manager'].includes(currentProfile?.role),fallback=initialCashbookShift(),dateNode=opsEl('cashbookDate'),codeNode=opsEl('cashbookShift'),employeeNode=opsEl('cashbookEmployee');
  if(!privileged&&currentShift?.id){dateNode.value=currentShift.shift_date;codeNode.value=String(currentShift.shift_code)}else if(!dateNode.value){dateNode.value=currentShift?.shift_date||fallback.date;codeNode.value=currentShift?.shift_code||fallback.code}
+ opsEl('cashbookHistoryControls')?.classList?.toggle('hidden',!privileged);
  dateNode.disabled=!privileged;codeNode.disabled=!privileged;employeeNode.disabled=!privileged;
  try{
  const list=await db.rpc('parking_cashbook_shifts',{p_date:dateNode.value,p_shift_code:Number(codeNode.value)});if(version!==cashbookLoadVersion)return;if(list.error)throw list.error;
