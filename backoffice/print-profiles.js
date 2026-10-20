@@ -29,11 +29,11 @@ function parkingCashbookTrayName(printer){
 async function parkingCashbookPrintConfigForPrinter(target,kind='cashbook'){
  const details=await qz.printers.details(),printers=Array.isArray(details)?details:[details],printer=printers.find(p=>p?.name===target);
  if(!printer)throw new Error('No se pudieron consultar las bandejas de '+target+'.');
- const config=parkingCashbookPrintConfig(parkingCashbookTrayName(printer));if(kind==='withdrawal'){config.copies=2;config.jobName='RETIRADA DE EFECTIVO · 2 COPIAS · BANDEJA 1'}if(kind==='cashvale'){config.jobName='VALE DE EFECTIVO · 1 COPIA · BANDEJA 1'}return config
+ const config=parkingCashbookPrintConfig(parkingCashbookTrayName(printer));if(kind==='withdrawal'){config.copies=2;config.jobName='RETIRADA DE EFECTIVO · 2 COPIAS · BANDEJA 1'}if(kind==='cashvale'){config.jobName='VALE DE EFECTIVO · 1 COPIA · BANDEJA 1'}if(kind==='cashexpense'){config.jobName='RECIBO DE GASTO · 1 COPIA · BANDEJA 1'}return config
 }
 function parkingHtmlPrintData(kind,html){
  const data={type:'pixel',format:'html',flavor:'plain',data:html};
  if(kind==='stay')data.options={pageWidth:100,pageHeight:210};
- if(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale')data.options={pageWidth:285,pageHeight:198};
+ if(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')data.options={pageWidth:285,pageHeight:198};
  return data;
 }

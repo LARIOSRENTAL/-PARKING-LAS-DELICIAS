@@ -302,7 +302,7 @@ function profileItem(label,value,cls=''){return '<div class="profileItem"><div c
 let subscriberPayments=[];let selectedSubscribers=new Set();let issuedParkingInvoices=[];
 function storedInvoice(type,id,month){return issuedParkingInvoices.find(x=>x.entity_type===type&&x.entity_id===id&&(type==='reservation'||x.billing_month===month))}
 async function loadIssuedParkingInvoices(){if(!['admin','manager'].includes(currentProfile?.role)){issuedParkingInvoices=[];return}const r=await db.from('parking_invoices').select('*').order('issued_at',{ascending:false});if(r.error){console.error('Facturas:',r.error);return}issuedParkingInvoices=r.data||[];renderMonthlySubscribers();renderReservations()}
-const PARKING_PRINTERS={invoice:'FACTURAS',stay:'RICOH MP 2003',cashbook:'HOJA DE CAJA',withdrawal:'HOJA DE CAJA',cashvale:'HOJA DE CAJA',ticket:'BIXOLON SRP-350III'};
+const PARKING_PRINTERS={invoice:'FACTURAS',stay:'RICOH MP 2003',cashbook:'HOJA DE CAJA',withdrawal:'HOJA DE CAJA',cashvale:'HOJA DE CAJA',cashexpense:'HOJA DE CAJA',ticket:'BIXOLON SRP-350III'};
 const PARKING_QZ_IDENTITY_DB='parking-qz-identity-v1';
 let parkingQzIdentity=null,parkingQzSigningLoaded=false;
 function parkingQzIdentityStore(mode,identity){return new Promise((resolve,reject)=>{const request=indexedDB.open(PARKING_QZ_IDENTITY_DB,1);request.onupgradeneeded=()=>request.result.createObjectStore('identity');request.onerror=()=>reject(new Error('Chrome no permite guardar la autorización local de QZ.'));request.onsuccess=()=>{const database=request.result;const tx=database.transaction('identity',mode);const store=tx.objectStore('identity');let result=null;const op=mode==='readwrite'?store.put(identity,'current'):store.get('current');op.onsuccess=()=>{result=op.result};tx.oncomplete=()=>{database.close();resolve(mode==='readwrite'?identity:result||null)};tx.onabort=()=>{database.close();reject(new Error('No se pudo guardar o leer la autorización local de QZ.'))}}})}
@@ -339,7 +339,7 @@ async function sendParkingPrint(kind,html,officeOnly=false){
  try{
   const hotelHtml=kind==='stay'&&html.includes('Bonos hotel ');
   const jobHtml=hotelHtml?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;margin:0!important;padding:0!important}.coupon{width:100mm!important;height:210mm!important;break-after:page!important}.coupon:last-child{break-after:auto!important}</style></head>'):kind==='stay'?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;height:210mm!important;margin:0!important;overflow:hidden!important}.ticket{margin:0 auto!important}.actions{display:none!important}</style></head>'):html;
-  const cfg=kind==='ticket'?{copies:1,color:false,size:{width:80,height:200},units:'mm',orientation:'portrait',margins:0}:kind==='stay'?parkingStayPrintConfig():(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale')?await parkingCashbookPrintConfigForPrinter(target,kind):{copies:1,color:false};
+  const cfg=kind==='ticket'?{copies:1,color:false,size:{width:80,height:200},units:'mm',orientation:'portrait',margins:0}:kind==='stay'?parkingStayPrintConfig():(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')?await parkingCashbookPrintConfigForPrinter(target,kind):{copies:1,color:false};
   if(hotelHtml){const pages=hotelCouponPrintPages(jobHtml);let sent=0;try{for(const pageHtml of pages){parkingQzStage='Enviando bono de hotel '+(sent+1)+' de '+pages.length+' a '+target;await qz.print(qz.configs.create(target,parkingStayPrintConfig()),[parkingHtmlPrintData('stay',pageHtml)]);sent++}}catch(e){throw new Error('Se han enviado '+sent+' de '+pages.length+' bonos a la cola. No repitas la tanda completa para evitar duplicados. Detalle: '+(e.message||e))}}
   else await qz.print(qz.configs.create(target,cfg),[parkingHtmlPrintData(kind,jobHtml)])
  }
@@ -608,7 +608,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="assets/jsbarcode-code128.min.js"></script>
 <script src="parking-layout.js?v=checkout-cages-20261019"></script>
 <script src="rates-planning.js?v=no-c-office-20261020-20261019a-web-20261017-real-spots-20261016"></script>
-<script src="operations.js?v=print-unbalanced-cash-20261020"></script>
+<script src="operations.js?v=last-ticket-reprint-20261020"></script>
 <script src="blacklist.js?v=20261015"></script>
 <script src="hotel-vouchers.js?v=stay-flow-20261019-conversion-print-20261019-voucher-enter-20261016"></script>
 <script src="bank-invoice-mail.js?v=subscriber-method-20261017"></script>
@@ -616,11 +616,11 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="stay-completion.js?v=overdue-exit-charge-20261019-end-order-20261017"></script>
 <script src="staff-users.js?v=access-20261017-users-20261016"></script>
 <script src="rotation-spots.js?v=tariff-first-quick-zone-20261020"></script>
-<script src="print-profiles.js?v=cashbook-20261017-dedicated-cash-queue-20261016"></script>
+<script src="print-profiles.js?v=expense-receipt-20261020"></script>
 <script src="cash-withdrawals.js?v=admin-preview-20261017"></script>
-<script src="cashbook-panel.js?v=autosave-count-20261020"></script>
+<script src="cashbook-panel.js?v=expense-receipt-20261020"></script>
 <script src="subscriber-deadlines.js?v=20261019a"></script>
 <script src="billing-exports.js?v=admin-billing-20261019-search-20261017-billing-20261017"></script>
-<script src="admin-print-preview.js?v=20261017-source-pdf-6"></script><datalist id="subscriberSpotChoices"></datalist>
+<script src="admin-print-preview.js?v=expense-receipt-20261020"></script><datalist id="subscriberSpotChoices"></datalist>
 <script src="stay-workflow.js?v=20261019-paid-create-edit"></script>
 </body></html>
