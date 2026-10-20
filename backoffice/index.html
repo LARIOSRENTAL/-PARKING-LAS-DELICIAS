@@ -530,11 +530,11 @@ async function printTotalStays(){
   const pages=[];for(let i=0;i<rows.length;i+=60)pages.push(rows.slice(i,i+60));
   if(!pages.length)pages.push([]);
   let html='<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Total estancias activas</title><style>'+
-  '@page{size:A4 portrait;margin:8mm 13mm}*{box-sizing:border-box}html,body{padding:0;margin:0;width:100%;color:#152639;font-family:Arial,sans-serif;font-size:7.4px}'+
+  '@page{size:A4 portrait;margin:8mm 13mm}*{box-sizing:border-box}html,body{padding:0;margin:0;width:100%;color:#152639;font-family:Arial,sans-serif;font-size:10px}'+
   '.printPage{width:184mm;max-width:100%;margin:0 auto;break-after:page;page-break-after:always}.printPage:last-child{break-after:auto;page-break-after:auto}'+
   'header{height:17mm;display:flex;align-items:center;justify-content:space-between;gap:4mm;border-bottom:1px solid #325477;margin-bottom:2mm}'+
   'header img{width:28mm;height:auto;max-height:12mm;object-fit:contain}h1{font-size:12px;margin:0}.sub{font-size:7px;color:#52667b}.meta{font-size:7px;text-align:right}.summary{margin-bottom:2mm;font-weight:700;font-size:8px}'+
-  'table{border-collapse:collapse;width:184mm;max-width:100%;table-layout:fixed;margin:0 auto}thead{display:table-header-group}th,td{border:.5px solid #acb8c4;padding:0 .8mm;height:3.66mm;line-height:1.1;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}th{background:#285781;color:white;font-weight:bold;height:4.2mm}'+
+  'table{border-collapse:collapse;width:184mm;max-width:100%;table-layout:fixed;margin:0 auto}thead{display:table-header-group}th,td{border:.5px solid #acb8c4;padding:0 .8mm;height:3.66mm;line-height:1.05;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}th{background:#285781;color:white;font-weight:bold;font-size:9.5px;height:4.2mm}'+
   'tbody tr{break-inside:avoid;page-break-inside:avoid}.outside td{background:#fbe5e8}.inside td{background:#fff2d3}.overdue td{background:#ffd1d1}.center{text-align:center}.plate{font-weight:700}footer{margin-top:2mm;font-size:7px;color:#52667b}'+
   '@media print{html,body{width:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.printPage{margin:0 auto}}'+
   '</style></head><body>';
