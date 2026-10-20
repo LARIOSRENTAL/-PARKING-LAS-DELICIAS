@@ -2,7 +2,7 @@
 let cashbookActiveTab='income',cashCountDirty=false,cashCountShiftId=null,cashCountBusy=false;
 const CASHBOOK_TABS=['income','count','withdrawals','expenses','vouchers'];
 const CASH_COUNT_FIELDS=['opening_balance','loose_coins','wrapped_coins','banknotes','vouchers'];
-let cashDenominationDraft={};
+let cashDenominationDraft={},cashCountRevision=0,cashCountSavePromise=null,cashCountAutoTimer=null;
 let activeCashVouchers=null,cashValeCancelBusy=false;
 let cashEntryBusy={expense:false,voucher:false},cashEntryPending={};
 function showCashbookTab(tab){cashbookActiveTab=CASHBOOK_TABS.includes(tab)?tab:'income';document.querySelectorAll('#cashbookTabs button').forEach(b=>b.classList.toggle('active',b.dataset.cashTab===cashbookActiveTab));document.querySelectorAll('.cashbookPane').forEach(e=>e.classList.toggle('hidden',e.dataset.cashPane!==cashbookActiveTab));if(cashbookActiveTab==='withdrawals')loadCashWithdrawals();saveParkingNavigation('cashbook')}
@@ -23,7 +23,7 @@ function cashDenominationChanged(){
  markCashCountDirty();
 }
 function normalCashAmount(value){const s=String(value||'').trim().replace(',','.');return /^\d+(\.\d{1,2})?$/.test(s)&&Number(s)<10000000000?Number(s):null}
-function markCashCountDirty(){cashCountDirty=true;try{sessionStorage.setItem(cashCountDraftKey(cashCountShiftId),JSON.stringify(cashCountValues()))}catch(e){}updateCashCountTotals()}
+function markCashCountDirty(){cashCountDirty=true;cashCountRevision++;try{sessionStorage.setItem(cashCountDraftKey(cashCountShiftId),JSON.stringify(cashCountValues()))}catch(e){}updateCashCountTotals();scheduleCashCountSave()}
 function updateCashCountTotals(){const v=cashCountValues(),number=k=>normalCashAmount(v[k])??0,cash=number('loose_coins')+number('wrapped_coins')+number('banknotes'),counted=cash+number('vouchers'),t=cashbookTotals(parkingCashbookData?.rows||[]),expected=number('opening_balance')+t.cash-Number(parkingCashbookData?.cash_state?.expense_total||0)-Number(parkingCashbookData?.withdrawal_total_eur||0),difference=Math.round((counted-expected)*100)/100;opsEl('cashCountTotal').textContent=money(cash);opsEl('cashCountBalance').textContent=money(counted);opsEl('cashCountExpected').textContent=money(expected);opsEl('cashCountDifference').textContent=money(difference);opsEl('cashCountDifference').style.color=difference?'#c62828':'#16804a';opsEl('cashCountMessage').textContent=cashCountDirty?'Cambios pendientes de guardar.':(parkingCashbookData?.cash_state?.saved?'Arqueo guardado.':'Comprueba el saldo de entrada y rellena el dinero contado.');}
 function renderCashbookPanel(data){
  if(!data){for(const key of CASH_COUNT_FIELDS){if(!cashCountDirty)opsEl('cashCount_'+key).value='';opsEl('cashCount_'+key).disabled=true}for(const id of ['cashCountTotal','cashCountBalance','cashCountExpected','cashCountDifference'])opsEl(id).textContent='—';opsEl('cashCountSave').disabled=true;opsEl('cashCountMessage').textContent='Resumen no disponible. Pulsa Actualizar caja para cargar tu turno; estos campos no representan un saldo de cero.';return}
@@ -35,7 +35,38 @@ function renderCashbookPanel(data){
  const legacy=Number(activeCashVouchers?.legacy_vouchers??data?.cash_state?.legacy_vouchers??0);if(legacy)opsEl('cashValeList').innerHTML+='<p class="muted">Vales anteriores sin desglose individual: '+money(legacy)+'. Incluidos en el resumen de caja.</p>';
  showCashbookTab(cashbookActiveTab);
 }
-async function saveCashCount(silent=false){if(cashCountBusy||!ownCashbookShift())return false;const values=cashCountValues(),normalized={};for(const key of CASH_COUNT_FIELDS){const n=normalCashAmount(values[key]);if(n===null){opsEl('cashCountMessage').textContent='Introduce importes válidos con hasta dos decimales.';if(!silent)opsEl('cashCount_'+key).focus();return false}normalized[key]=n.toFixed(2)}normalized.denomination_breakdown={};for(const group of ['loose_coins','wrapped_coins','banknotes']){normalized.denomination_breakdown[group]={};for(const [key,raw]of Object.entries(cashDenominationDraft[group]||{})){const n=normalCashAmount(raw);if(n===null){opsEl('cashCountMessage').textContent='Revisa los importes del desglose: usa como máximo dos decimales.';return false}normalized.denomination_breakdown[group][key]=n.toFixed(2)}}const shiftId=cashCountShiftId;cashCountBusy=true;opsEl('cashCountSave').disabled=true;try{const r=await db.rpc('parking_save_cash_count',{p_shift_id:shiftId,p_values:normalized});if(r.error)throw r.error;cashCountDirty=false;try{sessionStorage.removeItem(cashCountDraftKey(shiftId))}catch(e){}if(parkingCashbookData?.shift_id===shiftId){parkingCashbookData.cash_state=r.data;renderCashbookPanel(parkingCashbookData)}opsEl('cashCountMessage').textContent='Arqueo guardado.';return true}catch(e){opsEl('cashCountMessage').textContent='No se pudo guardar: '+e.message;return false}finally{cashCountBusy=false;opsEl('cashCountSave').disabled=!ownCashbookShift()}}
+function scheduleCashCountSave(delay=600){
+ clearTimeout(cashCountAutoTimer);
+ if(cashCountDirty&&ownCashbookShift())cashCountAutoTimer=setTimeout(()=>{cashCountAutoTimer=null;saveCashCount(true)},delay);
+}
+function flushCashCountOnBlur(event){if(event.target?.tagName==='INPUT'&&cashCountDirty)scheduleCashCountSave(0)}
+async function saveCashCount(silent=false){
+ clearTimeout(cashCountAutoTimer);cashCountAutoTimer=null;
+ if(cashCountSavePromise){const ok=await cashCountSavePromise;if(!ok)return false;return cashCountDirty?saveCashCount(silent):true}
+ if(!ownCashbookShift())return false;
+ cashCountSavePromise=persistCashCount(silent);
+ let ok;try{ok=await cashCountSavePromise}finally{cashCountSavePromise=null}
+ if(ok&&cashCountDirty&&ownCashbookShift())return saveCashCount(silent);
+ return ok;
+}
+async function persistCashCount(silent){
+ const values=cashCountValues(),normalized={};
+ for(const key of CASH_COUNT_FIELDS){const n=normalCashAmount(values[key]);if(n===null){opsEl('cashCountMessage').textContent='Introduce importes válidos con hasta dos decimales. Los cambios siguen pendientes de guardar.';if(!silent)opsEl('cashCount_'+key).focus();return false}normalized[key]=n.toFixed(2)}
+ normalized.denomination_breakdown={};
+ for(const group of ['loose_coins','wrapped_coins','banknotes']){normalized.denomination_breakdown[group]={};for(const [key,raw]of Object.entries(cashDenominationDraft[group]||{})){const n=normalCashAmount(raw);if(n===null){opsEl('cashCountMessage').textContent='Revisa los importes del desglose: usa como máximo dos decimales. Los cambios siguen pendientes de guardar.';return false}normalized.denomination_breakdown[group][key]=n.toFixed(2)}}
+ const shiftId=cashCountShiftId,revision=cashCountRevision;cashCountBusy=true;opsEl('cashCountSave').disabled=true;opsEl('cashCountMessage').textContent='Guardando automáticamente…';
+ try{
+  const r=await db.rpc('parking_save_cash_count',{p_shift_id:shiftId,p_values:normalized});if(r.error)throw r.error;
+  if(cashCountShiftId===shiftId){
+   if(parkingCashbookData?.shift_id===shiftId)parkingCashbookData.cash_state=r.data;
+   if(cashCountRevision===revision){cashCountDirty=false;try{sessionStorage.removeItem(cashCountDraftKey(shiftId))}catch(e){}}
+   updateCashCountTotals();if(!cashCountDirty)opsEl('cashCountMessage').textContent='Arqueo guardado automáticamente.';
+  }
+  return true;
+ }catch(e){if(cashCountShiftId===shiftId)opsEl('cashCountMessage').textContent='No se pudo guardar: '+e.message+'. Los cambios se conservan pendientes; vuelve a intentarlo.';return false}
+ finally{cashCountBusy=false;opsEl('cashCountSave').disabled=!ownCashbookShift()}
+}
+
 function cashEntryPendingKey(kind){return 'pld_cash_entry_pending:'+currentSession?.user?.id+':'+kind}
 function restoreCashEntryPending(kind){try{cashEntryPending[kind]=JSON.parse(sessionStorage.getItem(cashEntryPendingKey(kind))||'null')}catch(e){cashEntryPending[kind]=null}}
 function saveCashEntryPending(kind){try{if(cashEntryPending[kind])sessionStorage.setItem(cashEntryPendingKey(kind),JSON.stringify(cashEntryPending[kind]));else sessionStorage.removeItem(cashEntryPendingKey(kind))}catch(e){}}
