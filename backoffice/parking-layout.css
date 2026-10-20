@@ -13,3 +13,5 @@
 
 /* C office occupies the gap below C-22 and above C-19. */
 .planGroup[data-plan-zone="C"] .mapOffice{left:84%;right:auto;top:48%;width:15%;height:9%;padding:2px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+
+[data-cash-pane="count"] input[data-cash-total]{background:#edf1f5;color:#40546a;font-weight:800;cursor:default}

@@ -43,6 +43,15 @@ const parts={loose_coins:{'1':'50.00',unallocated:'0.00'},wrapped_coins:{'2':'20
 const detailed=await one('select parking_save_cash_count($1,$2)',[next,JSON.stringify({opening_balance:'970',loose_coins:'50',wrapped_coins:'200',banknotes:'700',vouchers:'999',denomination_breakdown:parts})]);
 assert.deepEqual(detailed.denomination_breakdown,parts);assert.equal(Number(detailed.counted_total),970);
 await assert.rejects(()=>one('select parking_save_cash_count($1,$2)',[next,JSON.stringify({opening_balance:'970',loose_coins:'51',wrapped_coins:'200',banknotes:'700',vouchers:'0',denomination_breakdown:parts})]),/no coincide/);
+// Closing a counted shift and opening the next preserves every entered denomination.
+await q('begin');
+const handedReport=await one('select parking_cashbook(current_date,2,$1)',[next]);
+await one('select parking_close_cash_shift($1,$2)',[next,JSON.stringify(handedReport)]);
+const third=await one("insert into staff_shifts(user_id,shift_code,shift_date,opened_at)values($1,3,current_date,clock_timestamp()+interval '1 second')returning id",[user]);
+const received=await one('select parking_cashbook(current_date,3,$1)',[third]);
+assert.equal(received.cash_state.inherited_from_shift,next);assert.equal(Number(received.cash_state.opening_balance),970);assert.equal(Number(received.cash_state.loose_coins),50);assert.equal(Number(received.cash_state.wrapped_coins),200);assert.equal(Number(received.cash_state.banknotes),700);assert.deepEqual(received.cash_state.denomination_breakdown,parts);
+const receivedSaved=await one('select parking_save_cash_count($1,$2)',[third,JSON.stringify({opening_balance:'970',loose_coins:'50',wrapped_coins:'200',banknotes:'700',vouchers:'20',denomination_breakdown:received.cash_state.denomination_breakdown})]);assert.deepEqual(receivedSaved.denomination_breakdown,parts);
+await q('rollback');
 const cancel=(id=vale.id,shiftId=next)=>one('select parking_cancel_cash_voucher($1,$2)',[id,shiftId]);
 await q('set role authenticated');
 assert.equal((await one('select parking_active_cash_vouchers()')).rows[0].id,vale.id);
