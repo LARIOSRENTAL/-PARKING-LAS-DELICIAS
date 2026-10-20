@@ -11,4 +11,7 @@ async function refreshSubscriberDeadlineAlerts(){
  box.innerHTML=late.length?'<div class="msg error" role="alert"><b>'+late.length+' abonado(s) con impago desde el día 15.</b> <button class="mini red" onclick="showArea(\'subscribers\')">Revisar abonados</button></div>':'';
 }
 
-setInterval(()=>{if(currentProfile)refreshSubscriberDeadlineAlerts().catch(()=>{})},60000);
+setInterval(()=>{if(currentProfile){if(typeof syncSubscriberBillingPeriod==='function'&&syncSubscriberBillingPeriod()&&document.getElementById('subscribers')?.classList.contains('active'))loadMonthlyPayments().catch(()=>{});refreshSubscriberDeadlineAlerts().catch(()=>{})}},60000);
+
+function subscriberTrainingWindow(month,now=new Date()){return month==='2026-10'&&now>=new Date('2026-10-19T22:00:00Z')&&now<new Date('2026-10-24T22:00:00Z')}
+function subscriberTrainingNotice(rows){return rows.some(s=>s.training?.active)||(typeof billingMonth==='function'&&subscriberTrainingWindow(billingMonth()))?'<div class="msg" role="status"><b>PRUEBAS · OCTUBRE</b><br>Las prácticas no generan ingresos ni facturas reales. El 25 de octubre se abrirán los recibos reales de noviembre.</div>':''}
