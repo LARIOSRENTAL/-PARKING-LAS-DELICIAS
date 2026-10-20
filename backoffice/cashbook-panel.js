@@ -60,3 +60,19 @@ async function cancelCashVale(id){
  catch(e){opsEl('cashValeMessage').textContent='No se pudo confirmar la cancelación: '+e.message+'. Puedes reintentarlo sin duplicar la devolución.'}
  finally{cashValeCancelBusy=false;renderCashbookPanel(parkingCashbookData)}
 }
+
+// Keep count entry fast for both pointer and keyboard users.
+function selectCashCountField(event){
+ const field=event.target;
+ if(field?.tagName==='INPUT'&&!field.disabled)field.select();
+}
+function advanceCashCountField(event){
+ if(event.key!=='Enter'||event.isComposing||event.target?.tagName!=='INPUT')return;
+ event.preventDefault();
+ if(event.repeat)return;
+ const form=event.target.form;
+ if(!form)return;
+ const fields=[...form.querySelectorAll('input,button')].filter(field=>!field.disabled&&!field.readOnly&&field.type!=='hidden'&&field.getClientRects().length);
+ const index=fields.indexOf(event.target),next=fields[index+(event.shiftKey?-1:1)];
+ if(next)next.focus();
+}
