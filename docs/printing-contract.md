@@ -12,9 +12,9 @@ No se crean estancias, cobros ni impresiones reales durante la validación. Para
 
 ## Hoja de caja al cerrar turno
 
-Cerrar turno imprime obligatoriamente una consulta fresca por el UUID del turno propio, incluso para gerente/administrador, sin reutilizar la consulta de pantalla por fecha. Se envía antes del cierre; si falla la consulta o el envío, no se cierra ni se termina la sesión. Se bloquean dobles pulsaciones. La aceptación de QZ significa enviado a la cola, no confirma la salida física del papel.
+Cerrar turno consulta una hoja fresca por el UUID del turno propio, guarda el arqueo y pide confirmación del saldo. La impresión se intenta antes del cierre, pero un fallo de impresora no impide cerrar. Se bloquean dobles pulsaciones. La aceptación de QZ significa enviado a la cola, no confirma la salida física del papel.
 
-El trabajo `cashbook` usa exclusivamente RICOH MP 2003, A5 horizontal (perfil HOJA DE CAJA), bandeja 1 (nombre exacto consultado con `qz.printers.details()`), márgenes de 6 mm. El HTML tiene anchura imprimible de 198 mm, con altura imprimible de 136 mm, raster ajustado a una única hoja de resumen (`rasterize:true`, `scaleContent:true`). Estos ajustes son locales al trabajo y nunca modifican las preferencias de Windows, los bonos verticales, las facturas ni los tickets. También se aplican al botón de reimpresión del resumen. La prueba cashbook-close.cjs verifica turno exacto, datos frescos, fallos, cancelación y doble clic, sin cerrar turnos reales.
+El trabajo `cashbook` usa exclusivamente la cola HOJA DE CAJA, A4 horizontal, bandeja 1 (nombre exacto consultado con `qz.printers.details()`), márgenes de 6 mm. El HTML tiene área imprimible 285×198 mm y una ficha de 136 mm de ancho centrada, con los saldos y el resumen en bloques consecutivos. El raster se ajusta a una hoja (`rasterize:true`, `scaleContent:true`). Estos ajustes son locales al trabajo y nunca modifican preferencias de Windows, bonos, facturas o tickets. También se aplican al botón de reimpresión. Las pruebas verifican turno exacto, datos frescos, fallos, cancelación y doble clic, sin cerrar turnos reales.
 
 ## Corrección del recorte ampliado (16/10, segunda comprobación física)
 
@@ -24,7 +24,9 @@ La regresión comprueba las dimensiones físicas de los trabajos normales y hote
 
 ## Resumen de cierre
 
-El cierre y el botón Imprimir resumen de caja imprimen únicamente los totales de Abonados, Estancias y Rotación, total cobrado y desglose por Tarjeta, Efectivo, Banco y Online. Incluyen fecha, turno y empleado en el cierre. No se imprimen matrículas, referencias ni movimientos individuales. El listado completo sigue disponible en pantalla. Se conserva el envío A5 horizontal por bandeja 1 de Ricoh y los ajustes locales ya definidos. La prueba usa 5000 cobros para comprobar que el tamaño del resumen no crece con los movimientos.
+El cierre y el botón Imprimir resumen de caja usan el mismo documento: saldo inicial, cobros por horas/estancias/recibos, ajustes de medios de pago, gastos, retiradas y saldo final. Debajo aparece RESUMEN DE CAJA con totales de monedas sueltas, empaquetadas, billetes, vales y suma; al final las firmas. Incluye fecha, turno y empleado. No imprime denominaciones, matrículas ni movimientos individuales. A4 horizontal es el tamaño físico del trabajo; el bloque del resumen conserva un ancho de 136 mm.
+
+Los apartados siguientes sobre A5 describen la investigación histórica y quedan sustituidos por el tamaño A4 confirmado por el usuario y por la corrección vigente del 20/10 al final de este documento.
 
 ## Selección estricta de bandeja (captura Ricoh 16/10 21:01)
 
@@ -61,3 +63,8 @@ En Windows puede crearse sin modificar la cola original mediante Get-Printer de 
 El menú principal pasa a 1. Rotación, 2. Estancias, 3. Abonados y abre Rotación al entrar. Planning de plazas sale del submenú Estancias y queda junto a Hoja de caja y Retirada, manteniendo su única vista, filtros, permisos y refresco automático. Las pruebas de navegación verifican carga y refresco en la nueva ubicación.
 
 La revisión de avisos de Supabase identifica el aviso genérico de función SECURITY DEFINER ejecutable para usuarios autenticados. Es intencional para parking_register_cash_withdrawal: la API es de personal, rechaza anónimos/inactivos/turno ajeno y necesita escritura atómica con auditoría sin conceder INSERT directo. Se verifican en Postgres los permisos de tabla, RLS y autorización dentro de la función.
+
+
+## Resumen de caja: A4 del controlador y bloques consecutivos (20/10/2026)
+
+La corrección vigente solicita exclusivamente A4 210×297 en horizontal a HOJA DE CAJA, bandeja 1, con área imprimible 285×198 mm y margen 6 mm. No se envía A5: era incompatible con el papel A4 declarado en esa bandeja. El HTML y la previsualización usan página 297×210 mm. Dentro de esa página se mantiene el resumen estrecho de 136 mm en una sola columna: primero los saldos del turno, debajo RESUMEN DE CAJA (solo totales) y al final las firmas. No se colocan los saldos y el arqueo en columnas paralelas. El tamaño físico del trabajo y el ancho del contenido son conceptos distintos. No se modifican los valores globales del controlador ni las otras colas.
