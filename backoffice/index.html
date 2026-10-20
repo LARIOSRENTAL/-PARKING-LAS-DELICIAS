@@ -527,14 +527,14 @@ async function printTotalStays(){
     x.pendingRotationAmount=!q.error&&Number.isFinite(Number(q.data?.amount_eur))?Number(q.data.amount_eur):null;
    }catch(e){console.warn('No se pudo calcular recargo de estancia',e);x.pendingRotationAmount=null}
   }));
-  const pages=[];for(let i=0;i<rows.length;i+=60)pages.push(rows.slice(i,i+60));
+  const pages=[];for(let i=0;i<rows.length;i+=56)pages.push(rows.slice(i,i+56));
   if(!pages.length)pages.push([]);
   let html='<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Total estancias activas</title><style>'+
-  '@page{size:A4 portrait;margin:8mm 13mm}*{box-sizing:border-box}html,body{padding:0;margin:0;width:100%;color:#152639;font-family:Arial,sans-serif;font-size:10px}'+
+  '@page{size:A4 portrait;margin:8mm 13mm}*{box-sizing:border-box}html,body{padding:0;margin:0;width:100%;color:#152639;font-family:Arial,sans-serif;font-size:12px}'+
   '.printPage{width:184mm;max-width:100%;margin:0 auto;break-after:page;page-break-after:always}.printPage:last-child{break-after:auto;page-break-after:auto}'+
   'header{height:17mm;display:flex;align-items:center;justify-content:space-between;gap:4mm;border-bottom:1px solid #325477;margin-bottom:2mm}'+
   'header img{width:28mm;height:auto;max-height:12mm;object-fit:contain}h1{font-size:12px;margin:0}.sub{font-size:7px;color:#52667b}.meta{font-size:7px;text-align:right}.summary{margin-bottom:2mm;font-weight:700;font-size:8px}'+
-  'table{border-collapse:collapse;width:184mm;max-width:100%;table-layout:fixed;margin:0 auto}thead{display:table-header-group}th,td{border:.5px solid #acb8c4;padding:0 .8mm;height:3.66mm;line-height:1.05;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}th{background:#285781;color:white;font-weight:bold;font-size:9.5px;height:4.2mm}'+
+  'table{border-collapse:collapse;width:184mm;max-width:100%;table-layout:fixed;margin:0 auto}thead{display:table-header-group}th,td{border:.5px solid #acb8c4;padding:0 .8mm;height:4mm;line-height:1.05;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}th{background:#285781;color:white;font-weight:bold;font-size:11px;height:4.5mm}'+
   'tbody tr{break-inside:avoid;page-break-inside:avoid}.outside td{background:#fbe5e8}.inside td{background:#fff2d3}.overdue td{background:#ffd1d1}.center{text-align:center}.plate{font-weight:700}footer{margin-top:2mm;font-size:7px;color:#52667b}'+
   '@media print{html,body{width:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.printPage{margin:0 auto}}'+
   '</style></head><body>';
@@ -545,9 +545,9 @@ async function printTotalStays(){
    '<thead><tr><th>Nº</th><th>Vehículo</th><th>Matrícula</th><th>Plaza</th><th>Días</th><th>Entrada</th><th>Fin previsto</th><th>Estado</th><th>Exceso</th><th>Debe</th></tr></thead><tbody>';
    for(let j=0;j<pages[p].length;j++){
     const x=pages[p][j],over=x.presence==='DENTRO'&&Date.now()>new Date(x.end).getTime();
-    html+='<tr class="'+(over?'overdue':x.presence==='DENTRO'?'inside':'outside')+'"><td class="center">'+(p*60+j+1)+'</td><td>'+esc(x.vehicle)+'</td><td class="plate">'+esc(x.plate)+'</td><td class="center">'+esc(x.spot)+'</td><td class="center">'+days(x)+'</td><td>'+fmtCompact(x.start)+'</td><td>'+fmtCompact(x.end)+'</td><td class="center">'+(x.presence==='DENTRO'?'DENTRO':'FUERA')+'</td><td class="center">'+excess(x)+'</td><td class="center">'+(over?(x.pendingRotationAmount===null?'Consultar':money(x.pendingRotationAmount)):'—')+'</td></tr>';
+    html+='<tr class="'+(over?'overdue':x.presence==='DENTRO'?'inside':'outside')+'"><td class="center">'+(p*56+j+1)+'</td><td>'+esc(x.vehicle)+'</td><td class="plate">'+esc(x.plate)+'</td><td class="center">'+esc(x.spot)+'</td><td class="center">'+days(x)+'</td><td>'+fmtCompact(x.start)+'</td><td>'+fmtCompact(x.end)+'</td><td class="center">'+(x.presence==='DENTRO'?'DENTRO':'FUERA')+'</td><td class="center">'+excess(x)+'</td><td class="center">'+(over?(x.pendingRotationAmount===null?'Consultar':money(x.pendingRotationAmount)):'—')+'</td></tr>';
    }
-   html+='</tbody></table><footer>Listado generado automáticamente desde el backoffice · Hasta 60 estancias por hoja A4</footer></section>';
+   html+='</tbody></table><footer>Listado generado automáticamente desde el backoffice · Hasta 56 estancias por hoja A4</footer></section>';
   }
   html+='<script>window.onload=()=>{document.fonts.ready.then(()=>window.print())}<'+'/script></body></html>';
   try{await sendParkingPrint('invoice',html);w.close()}catch(printError){if(remotePreview)throw printError;console.warn('QZ no disponible:',printError);if(confirm('No se pudo enviar a FACTURAS: '+printError.message+'\n\n¿Usar la impresión convencional?')){w.document.open();w.document.write(html);w.document.close()}else w.close()}
