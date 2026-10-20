@@ -80,7 +80,7 @@ async function loadSpots(){
  parkingPlanDetails.set(s.id,{spot:s,state,detail,actions});
  const title=s.code+' · '+state+' · '+s.spot_class+(holders.length?' · '+holders.map(x=>x.customer_name+' · '+x.plate).join(' / '):'');
  cards.push(`<button type="button" class="spot ${cls}" style="${parkingMapPosition(zone,s.code)}" title="${esc(title)}" aria-label="${esc(title)}" onclick="openParkingSpotDetail('${s.id}')"><strong>${esc(s.code)}</strong><small>${esc(s.spot_class||'')} · ${state}</small></button>`)
- }if(cards.length){const map=['J','C','B'].includes(zone);html+='<div class="panel planGroup" data-plan-zone="'+esc(zone)+'"><h3>'+esc(zone)+' · '+cards.length+' plazas</h3><div class="'+(map?'parkingMap':'planGrid')+'">'+cards.join('')+(map?'<span class="mapAisle">PASILLO · '+esc(zone)+'</span>':'')+(zone==='J'?'<span class="mapOffice">OFICINA</span>':'')+'</div></div>'}}
+ }if(cards.length){const map=['J','C','B'].includes(zone);html+='<div class="panel planGroup" data-plan-zone="'+esc(zone)+'"><h3>'+esc(zone)+' · '+cards.length+' plazas</h3><div class="'+(map?'parkingMap':'planGrid')+'">'+cards.join('')+(map?'<span class="mapAisle">PASILLO · '+esc(zone)+'</span>':'')+(['J','C'].includes(zone)?'<span class="mapOffice">OFICINA</span>':'')+'</div></div>'}}
  document.getElementById('spotsBody').innerHTML=html;if(!zones.includes(parkingPlanZone))parkingPlanZone=zones[0];switchParkingPlanZone(parkingPlanZone);renderQuickBlocks();
 }
 async function editInventoryState(id){
