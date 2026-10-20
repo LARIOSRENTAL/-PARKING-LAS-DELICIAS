@@ -1,3 +1,5 @@
+function orderedRotationTariffs(){const order=['TURISMO','COCHERA','CAMION','MOTO'];return [...rotationTariffs].sort((a,b)=>(order.includes(a.code)?order.indexOf(a.code):99)-(order.includes(b.code)?order.indexOf(b.code):99))}
+function prepareRotationEntryTariff(){const field=opsEl('rotTariff');field.disabled=false;opsEl('rotKeyNumber').value='';hideRotationSpotMatches();opsEl('rotSpotStatus').textContent='Elige tarifa y pulsa Intro para seleccionar plaza.';field.focus()}
 /* Rotation uses the same named inventory as stays. A = Salón Alto (no keys). */
 let rotationAvailableSpots=[],rotationSpotsLoaded=false,rotationSpotsRequest=0,rotationEntryBusy=false;
 function rotationSpotType(code){return {COCHERA:'XL',CAMION:'XXL'}[code]||code}
@@ -14,9 +16,9 @@ function rotationSpotInputMatches(s,text){return (!text||normalizeRotationSpot(s
 function showRotationSpotMatches(){
  const list=opsEl('rotationSpotMatches'),input=opsEl('rotKeyNumber');if(!list||input.disabled)return;
  const text=normalizeRotationSpot(input.value);
- rotationSpotMatchRows=rotationSpotCandidates().filter(s=>rotationSpotInputMatches(s,text));rotationSpotMatchIndex=-1;
- list.innerHTML=rotationSpotMatchRows.length?rotationSpotMatchRows.map((s,i)=>'<button type="button" role="option" id="rotationSpotMatch-'+i+'" data-spot-index="'+i+'" aria-selected="false" style="display:block;width:100%;padding:10px 12px;background:white;border:0;border-bottom:1px solid #dce4ec;text-align:left;color:#142b40;font-size:16px;cursor:pointer"><b>'+esc(s.code)+'</b> · '+esc(['A','M'].includes(s.zone)?s.spot_class+' · Sin llaves':s.spot_class||s.vehicle_type||'Disponible')+'</button>').join(''):'<div style="padding:12px;color:#a51d32">No hay plazas disponibles que coincidan.</div>';
- list.style.display='block';input.setAttribute('aria-expanded','true')
+ rotationSpotMatchRows=rotationSpotCandidates().filter(s=>['A','M'].includes(text)?s.zone===text:rotationSpotInputMatches(s,text));if(['A','M'].includes(text))rotationSpotMatchRows.sort((a,b)=>a.code.localeCompare(b.code,'es',{numeric:true}));rotationSpotMatchIndex=['A','M'].includes(text)&&rotationSpotMatchRows.length?0:-1;
+ list.innerHTML=rotationSpotMatchRows.length?rotationSpotMatchRows.map((s,i)=>'<button type="button" role="option" id="rotationSpotMatch-'+i+'" data-spot-index="'+i+'" aria-selected="'+(i===rotationSpotMatchIndex?'true':'false')+'" style="display:block;width:100%;padding:10px 12px;background:white;border:0;border-bottom:1px solid #dce4ec;text-align:left;color:#142b40;font-size:16px;cursor:pointer"><b>'+esc(s.code)+'</b> · '+esc(['A','M'].includes(s.zone)?s.spot_class+' · Sin llaves':s.spot_class||s.vehicle_type||'Disponible')+'</button>').join(''):'<div style="padding:12px;color:#a51d32">No hay plazas disponibles que coincidan.</div>';
+ list.style.display='block';input.setAttribute('aria-expanded','true');if(rotationSpotMatchIndex===0){const first=rotationSpotMatchRows[0];input.setAttribute('aria-activedescendant','rotationSpotMatch-0');const option=list.querySelector?.('[data-spot-index]');if(option)option.style.backgroundColor='#e2f4ed';opsEl('rotSpotStatus').textContent='Plaza '+first.code+' seleccionada · Intro para dar entrada.'}
 }
 function chooseRotationSpotMatch(index){const s=rotationSpotMatchRows[index];if(!s)return;opsEl('rotKeyNumber').value=s.code;rotationSpotChanged();hideRotationSpotMatches();opsEl('rotKeyNumber').focus()}
 function rotationSpotChanged(){
@@ -45,7 +47,7 @@ spotField.addEventListener('blur',()=>{rotationSpotChanged();hideRotationSpotMat
 const spotMatches=opsEl('rotationSpotMatches');
 spotMatches.addEventListener('mousedown',e=>e.preventDefault());
 spotMatches.addEventListener('click',e=>{const option=e.target.closest('[data-spot-index]');if(option)chooseRotationSpotMatch(Number(option.dataset.spotIndex))});spotField.addEventListener('change',()=>{const s=selectedRotationSpot();if(s)spotField.value=s.code;rotationSpotChanged()});
-spotField.addEventListener('keydown',event=>{
+spotField.addEventListener('keydown',async event=>{
  if(event.key==='Escape'){hideRotationSpotMatches();return}
  if(event.key==='ArrowDown'||event.key==='ArrowUp'){
   event.preventDefault();if(opsEl('rotationSpotMatches').style.display!=='block')showRotationSpotMatches();
@@ -55,6 +57,8 @@ spotField.addEventListener('keydown',event=>{
   options.forEach((el,i)=>{el.style.backgroundColor=i===rotationSpotMatchIndex?'#e2f4ed':'white';el.setAttribute('aria-selected',String(i===rotationSpotMatchIndex))});
   const active=options[rotationSpotMatchIndex];if(active){spotField.setAttribute('aria-activedescendant',active.id);active.scrollIntoView({block:'nearest'})}return
  }
- if(event.key==='Enter'){event.preventDefault();event.stopImmediatePropagation();if(rotationSpotMatchIndex>=0){chooseRotationSpotMatch(rotationSpotMatchIndex);return}hideRotationSpotMatches();rotationCheckIn()}
+ if(event.key==='Enter'){event.preventDefault();event.stopImmediatePropagation();if(['A','M'].includes(normalizeRotationSpot(spotField.value))){const zone=normalizeRotationSpot(spotField.value),available=rotationSpotCandidates().filter(s=>s.zone===zone).sort((a,b)=>a.code.localeCompare(b.code,'es',{numeric:true})),first=available[Math.max(0,rotationSpotMatchIndex)]||available[0];if(first){spotField.value=first.code;rotationSpotChanged();hideRotationSpotMatches();await rotationCheckIn()}else{rotationSpotChanged();opsEl('rotSpotStatus').textContent='No hay plazas '+zone+' disponibles para este tamaño.'}return}if(rotationSpotMatchIndex>=0){chooseRotationSpotMatch(rotationSpotMatchIndex);return}hideRotationSpotMatches();await rotationCheckIn()}
 });
 opsEl('rotTariff').addEventListener('change',()=>{spotField.value='';renderRotationSpotOptions();rotationSpotChanged()});
+
+opsEl('rotTariff').addEventListener('keydown',async event=>{if(event.key!=='Enter'||event.repeat||event.isComposing)return;event.preventDefault();event.stopImmediatePropagation();if(currentRotationSession)return;await prepareRotationEntrySpot()});
