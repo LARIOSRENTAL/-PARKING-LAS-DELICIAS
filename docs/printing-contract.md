@@ -68,3 +68,8 @@ La revisión de avisos de Supabase identifica el aviso genérico de función SEC
 ## Resumen de caja: A4 del controlador y bloques consecutivos (20/10/2026)
 
 La corrección vigente solicita exclusivamente A4 210×297 en horizontal a HOJA DE CAJA, bandeja 1, con área imprimible 285×198 mm y margen 6 mm. No se envía A5: era incompatible con el papel A4 declarado en esa bandeja. El HTML y la previsualización usan página 297×210 mm. Dentro de esa página se mantiene el resumen estrecho de 136 mm en una sola columna: primero los saldos del turno, debajo RESUMEN DE CAJA (solo totales) y al final las firmas. No se colocan los saldos y el arqueo en columnas paralelas. El tamaño físico del trabajo y el ancho del contenido son conceptos distintos. No se modifican los valores globales del controlador ni las otras colas.
+
+
+## Centrado de la hoja de caja (20/10/2026, referencia Excel)
+
+El lienzo HTML tiene el tamaño completo del área imprimible A4 horizontal: 285×198 mm, tanto ancho como alto. Una tabla de presentación con una única celda centra la ficha de 136 mm en ambos ejes (`align=center`, `valign=middle`), sin depender del alineado del raster por QZ ni de márgenes automáticos. El resumen continúa debajo de los saldos. Se mantienen A4 horizontal, bandeja 1, una copia y raster escalado; ningún otro documento cambia. La comprobación de geometría del PDF verifica los centros del bloque y los límites de texto sobre la página física.
