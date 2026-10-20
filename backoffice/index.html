@@ -478,11 +478,11 @@ function activeTotalStayRows(){
    if(r.vehicle_presence==='FUERA'&&new Date(r.exit_at).getTime()<=now)continue;
    if(!['DENTRO','FUERA'].includes(r.vehicle_presence))continue;
    const spot=spots.find(s=>s.id===r.assigned_spot_id);
-   byId.set(r.id,{reference:r.reference,spot:spot?.code||'—',plate:r.plate||'—',vehicle:r.vehicle_make_model||r.vehicle_types?.name||'',customer:r.customer_name||'—',phone:r.customer_phone||'',start:r.entry_at,end:r.exit_at,presence:r.vehicle_presence});
+   byId.set(r.id,{reference:r.reference,spot:spot?.code||'—',plate:r.plate||'—',vehicle:r.vehicle_make_model||r.vehicle_types?.name||'',customer:r.customer_name||'—',phone:r.customer_phone||'',vehicleType:r.vehicle_types?.code||r.vehicle_type_code||'',start:r.entry_at,end:r.exit_at,presence:r.vehicle_presence});
  }
  for(const x of insideSessions){if(x.billing_mode!=='reservation'||(x.reservation_id&&byId.has(x.reservation_id)))continue;
   if(x.reservation_id&&reservations.some(r=>r.id===x.reservation_id&&['cancelled','expired','completed'].includes(r.status)))continue;
-  byId.set(x.reservation_id||x.id,{reference:reservations.find(r=>r.id===x.reservation_id)?.reference||'—',spot:x.parking_spots?.code||spots.find(s=>s.id===x.spot_id)?.code||'—',plate:x.plate||'—',vehicle:x.vehicle_make_model||'',customer:x.customer_name||'—',phone:x.customer_phone||'',start:x.actual_entry_at||x.planned_entry_at,end:x.planned_exit_at,presence:'DENTRO'});
+  byId.set(x.reservation_id||x.id,{reference:reservations.find(r=>r.id===x.reservation_id)?.reference||'—',spot:x.parking_spots?.code||spots.find(s=>s.id===x.spot_id)?.code||'—',plate:x.plate||'—',vehicle:x.vehicle_make_model||'',customer:x.customer_name||'—',phone:x.customer_phone||'',vehicleType:x.vehicle_types?.code||'',start:x.actual_entry_at||x.planned_entry_at,end:x.planned_exit_at,presence:'DENTRO'});
  }
  return [...byId.values()].sort((a,b)=>(new Date(a.end)-new Date(b.end))||String(a.spot).localeCompare(String(b.spot),'es',{numeric:true}));
 }
@@ -505,6 +505,24 @@ async function printTotalStays(){
   const fmtCompact=v=>v?new Date(v).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
   const days=(x)=>Math.max(1,Math.ceil((new Date(x.end).getTime()-new Date(x.start).getTime())/86400000))||'—';
   const excess=(x)=>{const ms=Date.now()-new Date(x.end).getTime();if(x.presence!=='DENTRO'||!Number.isFinite(ms)||ms<=0)return '—';const mins=Math.ceil(ms/60000);return Math.floor(mins/60)+'h '+String(mins%60).padStart(2,'0')+'m';};
+  // Calculate outstanding fees with the exact same Supabase RPC used in Rotacion.
+  const valuationTime=new Date().toISOString();
+  function tariffForStay(x){
+   const code=String(x.vehicleType||'').toUpperCase(),description=String(x.vehicle||'').toUpperCase();
+   const category=code==='MOTO'||/MOTO|SCOOTER/.test(description)?'MOTO':
+     /CAMI[OÓ]N|TRUCK/.test(code+' '+description)?'CAMION':
+     /COCHERA/.test(code+' '+description)?'COCHERA':'TURISMO';
+   const aliases={TURISMO:['TURISMO','COCHE','AUTO'],CAMION:['CAMION','CAMIÓN','TRUCK'],COCHERA:['COCHERA'],MOTO:['MOTO','MOTOCICLETA']};
+   return rotationTariffs.find(t=>aliases[category].some(a=>String(t.code||'').toUpperCase()===a))?.code||null;
+  }
+  const overdueRows=rows.filter(x=>x.presence==='DENTRO'&&new Date(x.end).getTime()<new Date(valuationTime).getTime());
+  await Promise.all(overdueRows.map(async x=>{
+   const tariff=tariffForStay(x);if(!tariff){x.pendingRotationAmount=null;return}
+   try{
+    const q=await db.rpc('calculate_rotation_amount',{p_tariff_code:tariff,p_entry_at:x.end,p_exit_at:valuationTime});
+    x.pendingRotationAmount=!q.error&&Number.isFinite(Number(q.data?.amount_eur))?Number(q.data.amount_eur):null;
+   }catch(e){console.warn('No se pudo calcular recargo de estancia',e);x.pendingRotationAmount=null}
+  }));
   const pages=[];for(let i=0;i<rows.length;i+=60)pages.push(rows.slice(i,i+60));
   if(!pages.length)pages.push([]);
   let html='<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Total estancias activas</title><style>'+
@@ -519,11 +537,11 @@ async function printTotalStays(){
   for(let p=0;p<pages.length;p++){
    html+='<section class="printPage"><header><img src="https://lariosrental.github.io/-PARKING-LAS-DELICIAS/backoffice/assets/logo-las-delicias.png?v=original-20261014" alt="Logo oficial Las Delicias"><div><h1>TOTAL ESTANCIAS</h1><div class="sub">Estancias por días · ordenadas por fin previsto</div></div><div class="meta">'+esc(date)+'<br>Página '+(p+1)+' / '+pages.length+'</div></header>'+
    '<div class="summary">Total: '+rows.length+' · Dentro: '+within+' · Fuera con plaza: '+(rows.length-within)+'</div>'+
-   '<table><colgroup><col style="width:5%"><col style="width:13%"><col style="width:12%"><col style="width:10%"><col style="width:7%"><col style="width:17%"><col style="width:17%"><col style="width:9%"><col style="width:10%"></colgroup>'+
-   '<thead><tr><th>Nº</th><th>Vehículo</th><th>Matrícula</th><th>Plaza</th><th>Días</th><th>Entrada</th><th>Fin previsto</th><th>Estado</th><th>Exceso</th></tr></thead><tbody>';
+   '<table><colgroup><col style="width:4%"><col style="width:12%"><col style="width:12%"><col style="width:9%"><col style="width:6%"><col style="width:17%"><col style="width:17%"><col style="width:8%"><col style="width:8%"><col style="width:7%"></colgroup>'+
+   '<thead><tr><th>Nº</th><th>Vehículo</th><th>Matrícula</th><th>Plaza</th><th>Días</th><th>Entrada</th><th>Fin previsto</th><th>Estado</th><th>Exceso</th><th>Debe</th></tr></thead><tbody>';
    for(let j=0;j<pages[p].length;j++){
     const x=pages[p][j],over=x.presence==='DENTRO'&&Date.now()>new Date(x.end).getTime();
-    html+='<tr class="'+(over?'overdue':x.presence==='DENTRO'?'inside':'outside')+'"><td class="center">'+(p*60+j+1)+'</td><td>'+esc(x.vehicle)+'</td><td class="plate">'+esc(x.plate)+'</td><td class="center">'+esc(x.spot)+'</td><td class="center">'+days(x)+'</td><td>'+fmtCompact(x.start)+'</td><td>'+fmtCompact(x.end)+'</td><td class="center">'+(x.presence==='DENTRO'?'DENTRO':'FUERA')+'</td><td class="center">'+excess(x)+'</td></tr>';
+    html+='<tr class="'+(over?'overdue':x.presence==='DENTRO'?'inside':'outside')+'"><td class="center">'+(p*60+j+1)+'</td><td>'+esc(x.vehicle)+'</td><td class="plate">'+esc(x.plate)+'</td><td class="center">'+esc(x.spot)+'</td><td class="center">'+days(x)+'</td><td>'+fmtCompact(x.start)+'</td><td>'+fmtCompact(x.end)+'</td><td class="center">'+(x.presence==='DENTRO'?'DENTRO':'FUERA')+'</td><td class="center">'+excess(x)+'</td><td class="center">'+(over?(x.pendingRotationAmount===null?'Consultar':money(x.pendingRotationAmount)):'—')+'</td></tr>';
    }
    html+='</tbody></table><footer>Listado generado automáticamente desde el backoffice · Hasta 60 estancias por hoja A4</footer></section>';
   }
