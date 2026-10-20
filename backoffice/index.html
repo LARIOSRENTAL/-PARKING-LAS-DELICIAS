@@ -319,7 +319,7 @@ async function connectParkingQz(){
  try{await qz.websocket.connect({retries:1,delay:1})}
  catch(e){throw new Error('No se pudo conectar con QZ Tray desde el backoffice: '+(e.message||e)+'. Revisa si Chrome pide permiso para acceder a dispositivos de la red local.')}
 }
-function hotelCouponPrintPages(html){const doc=new DOMParser().parseFromString(html,'text/html');const coupons=Array.from(doc.querySelectorAll('.coupon'));if(!coupons.length)throw new Error('No se encontraron bonos de hotel para imprimir.');return coupons.map(coupon=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+coupon.outerHTML+'<script>window.addEventListener('load',()=>{const n=document.querySelector('.mainNav');if(!n)return;const measure=()=>document.documentElement.style.setProperty('--parking-mainnav-height',Math.ceil(n.getBoundingClientRect().height)+'px');measure();window.addEventListener('resize',measure);if(window.ResizeObserver)new ResizeObserver(measure).observe(n)})</script></body></html>')}
+function hotelCouponPrintPages(html){const doc=new DOMParser().parseFromString(html,'text/html');const coupons=Array.from(doc.querySelectorAll('.coupon'));if(!coupons.length)throw new Error('No se encontraron bonos de hotel para imprimir.');return coupons.map(coupon=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+coupon.outerHTML+'</body></html>')}
 async function sendParkingPrint(kind,html,officeOnly=false){
  if(!officeOnly&&typeof shouldPreviewParkingPrint==='function'&&shouldPreviewParkingPrint())return prepareAdminPrintPreview(kind,html);
  await connectParkingQz();
@@ -655,6 +655,7 @@ async function saveStaffUser(userId){const u=staffUsers.find(x=>x.user_id===user
 function changeStaffPassword(userId){openStaffPanel(userId)}
 db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&!openingShift)setTimeout(boot,0)});window.addEventListener('load',()=>boot(),{once:true});
 </script>
+<script>window.addEventListener('load',function(){const n=document.querySelector('.mainNav');if(!n)return;const measure=()=>document.documentElement.style.setProperty('--parking-mainnav-height',Math.ceil(n.getBoundingClientRect().height)+'px');measure();window.addEventListener('resize',measure);if(window.ResizeObserver)new ResizeObserver(measure).observe(n)});</script>
 <script src="assets/jsbarcode-code128.min.js"></script>
 <script src="parking-layout.js?v=checkout-cages-20261019"></script>
 <script src="rates-planning.js?v=c-office-restored-20261020"></script>
