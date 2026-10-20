@@ -499,11 +499,36 @@ async function loadTotalStays(){await Promise.all([loadReservations(),loadInside
 async function printTotalStays(){
  const remotePreview=typeof shouldPreviewParkingPrint==='function'&&shouldPreviewParkingPrint();
  const w=remotePreview?{close(){}}:window.open('','_blank');if(!w)return alert('Permite ventanas emergentes para imprimir las estancias.');
- try{await loadTotalStays();const rows=activeTotalStayRows(),date=new Date().toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}),within=rows.filter(x=>x.presence==='DENTRO').length;
- let html='<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Total estancias activas</title><style>@page{size:A4 portrait;margin:11mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#152639;margin:0}h1{font-size:19px;margin:0 0 5px}header{display:flex;justify-content:space-between;border-bottom:2px solid #203e64;padding-bottom:10px;margin-bottom:12px}.muted{color:#52667b}.summary{margin-bottom:12px;font-weight:bold}table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{border:1px solid #afbac5;padding:6px 5px;text-align:left;overflow-wrap:anywhere;vertical-align:top}thead{display:table-header-group}th{background:#e6ecf3}tr{break-inside:avoid}.lateRow td{background:#ffd9d9}.soonRow td{background:#fff4ba}td span{display:block;color:#536578;margin-top:3px;font-size:9px}footer{margin-top:9px;font-size:9px;color:#536578}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><header><div><img src="https://lariosrental.github.io/-PARKING-LAS-DELICIAS/backoffice/assets/logo-las-delicias.png?v=original-20261014" alt="Logo oficial Las Delicias" width="588" height="181" style="display:block;width:48mm;height:auto;margin-bottom:7px"><h1>TOTAL ESTANCIAS</h1><div class="muted">Estancias por días activas y plazas asignadas</div></div><div style="text-align:right">'+esc(date)+'</div></header><div class="summary">Total: '+rows.length+' · Dentro: '+within+' · Fuera con plaza: '+(rows.length-within)+'</div><table><thead><tr><th style="width:9%">Plaza</th><th style="width:15%">Referencia</th><th style="width:22%">Cliente</th><th style="width:20%">Vehículo</th><th style="width:14%">Entrada</th><th style="width:14%">Fin</th><th style="width:6%">Estado</th></tr></thead><tbody>';
- for(const x of rows)html+='<tr class="'+stayAttentionClass(x.end)+'"><td><b>'+esc(x.spot)+'</b></td><td>'+esc(x.reference)+'</td><td>'+esc(x.customer)+'<span>'+esc(x.phone)+'</span></td><td>'+esc(x.plate)+'<span>'+esc(x.vehicle)+'</span></td><td>'+fmt(x.start)+'</td><td>'+fmt(x.end)+'</td><td>'+(x.presence==='DENTRO'?'Dentro':'Fuera')+'</td></tr>';
- html+='</tbody></table><footer>Listado generado automáticamente desde el backoffice. Si el número de estancias supera el espacio disponible, la tabla continúa en las hojas necesarias.</footer><script>window.onload=()=>window.print()<\\/script></body></html>';
- try{await sendParkingPrint('invoice',html);w.close();}catch(printError){if(remotePreview)throw printError;console.warn('QZ no disponible:',printError);if(confirm('No se pudo enviar a FACTURAS: '+printError.message+'\n\n¿Usar la impresión convencional?')){w.document.open();w.document.write(html);w.document.close()}else w.close()}
+ try{
+  await loadTotalStays();
+  const rows=activeTotalStayRows(),date=new Date().toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}),within=rows.filter(x=>x.presence==='DENTRO').length;
+  const fmtCompact=v=>v?new Date(v).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+  const days=(x)=>Math.max(1,Math.ceil((new Date(x.end).getTime()-new Date(x.start).getTime())/86400000))||'—';
+  const excess=(x)=>{const ms=Date.now()-new Date(x.end).getTime();if(x.presence!=='DENTRO'||!Number.isFinite(ms)||ms<=0)return '—';const mins=Math.ceil(ms/60000);return Math.floor(mins/60)+'h '+String(mins%60).padStart(2,'0')+'m';};
+  const pages=[];for(let i=0;i<rows.length;i+=60)pages.push(rows.slice(i,i+60));
+  if(!pages.length)pages.push([]);
+  let html='<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Total estancias activas</title><style>'+
+  '@page{size:A4 portrait;margin:8mm 8mm 8mm 8mm}*{box-sizing:border-box}html,body{padding:0;margin:0;width:100%;color:#152639;font-family:Arial,sans-serif;font-size:7.4px}'+
+  '.printPage{width:100%;break-after:page;page-break-after:always}.printPage:last-child{break-after:auto;page-break-after:auto}'+
+  'header{height:17mm;display:flex;align-items:center;justify-content:space-between;gap:4mm;border-bottom:1px solid #325477;margin-bottom:2mm}'+
+  'header img{width:28mm;height:auto;max-height:12mm;object-fit:contain}h1{font-size:12px;margin:0}.sub{font-size:7px;color:#52667b}.meta{font-size:7px;text-align:right}.summary{margin-bottom:2mm;font-weight:700;font-size:8px}'+
+  'table{border-collapse:collapse;width:100%;table-layout:fixed}thead{display:table-header-group}th,td{border:.5px solid #acb8c4;padding:0 1.4mm;height:3.66mm;line-height:1.1;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}th{background:#285781;color:white;font-weight:bold;height:4.2mm}'+
+  'tbody tr{break-inside:avoid;page-break-inside:avoid}.outside td{background:#fbe5e8}.inside td{background:#fff2d3}.overdue td{background:#ffd1d1}.center{text-align:center}.plate{font-weight:700}footer{margin-top:2mm;font-size:7px;color:#52667b}'+
+  '@media print{html,body{width:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact} .printPage{margin:0}}'+
+  '</style></head><body>';
+  for(let p=0;p<pages.length;p++){
+   html+='<section class="printPage"><header><img src="https://lariosrental.github.io/-PARKING-LAS-DELICIAS/backoffice/assets/logo-las-delicias.png?v=original-20261014" alt="Logo oficial Las Delicias"><div><h1>TOTAL ESTANCIAS</h1><div class="sub">Estancias por días · ordenadas por fin previsto</div></div><div class="meta">'+esc(date)+'<br>Página '+(p+1)+' / '+pages.length+'</div></header>'+
+   '<div class="summary">Total: '+rows.length+' · Dentro: '+within+' · Fuera con plaza: '+(rows.length-within)+'</div>'+
+   '<table><colgroup><col style="width:5%"><col style="width:13%"><col style="width:12%"><col style="width:10%"><col style="width:7%"><col style="width:17%"><col style="width:17%"><col style="width:9%"><col style="width:10%"></colgroup>'+
+   '<thead><tr><th>Nº</th><th>Vehículo</th><th>Matrícula</th><th>Plaza</th><th>Días</th><th>Entrada</th><th>Fin previsto</th><th>Estado</th><th>Exceso</th></tr></thead><tbody>';
+   for(let j=0;j<pages[p].length;j++){
+    const x=pages[p][j],over=x.presence==='DENTRO'&&Date.now()>new Date(x.end).getTime();
+    html+='<tr class="'+(over?'overdue':x.presence==='DENTRO'?'inside':'outside')+'"><td class="center">'+(p*60+j+1)+'</td><td>'+esc(x.vehicle)+'</td><td class="plate">'+esc(x.plate)+'</td><td class="center">'+esc(x.spot)+'</td><td class="center">'+days(x)+'</td><td>'+fmtCompact(x.start)+'</td><td>'+fmtCompact(x.end)+'</td><td class="center">'+(x.presence==='DENTRO'?'DENTRO':'FUERA')+'</td><td class="center">'+excess(x)+'</td></tr>';
+   }
+   html+='</tbody></table><footer>Listado generado automáticamente desde el backoffice · Hasta 60 estancias por hoja A4</footer></section>';
+  }
+  html+='<script>window.onload=()=>{document.fonts.ready.then(()=>window.print())}<\\/script></body></html>';
+  try{await sendParkingPrint('invoice',html);w.close()}catch(printError){if(remotePreview)throw printError;console.warn('QZ no disponible:',printError);if(confirm('No se pudo enviar a FACTURAS: '+printError.message+'\n\n¿Usar la impresión convencional?')){w.document.open();w.document.write(html);w.document.close()}else w.close()}
  }catch(e){w.close();alert('No se pudo imprimir el listado: '+e.message)}
 }
 async function loadInside(){const r=await db.from('parking_sessions').select('id,reservation_id,vehicle_type_id,spot_id,plate,vehicle_make_model,customer_name,customer_phone,planned_entry_at,planned_exit_at,actual_entry_at,status,billing_mode,parking_spots(code),vehicle_types(name,code)').eq('status','inside').order('planned_exit_at',{ascending:true});insideSessions=r.data||[];renderInside()}
