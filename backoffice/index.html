@@ -147,7 +147,7 @@ async function closeShiftAndLogout(){
    const saved=await db.rpc('parking_save_cash_count',{p_shift_id:shift.id,p_values:values});if(saved.error)throw Error('No se pudo guardar el saldo recibido: '+saved.error.message);
    report=await readClosingCashbook(shift);if(!report.cash_state?.saved)throw Error('No se pudo confirmar el arqueo guardado. Vuelve a intentarlo.');if(!cashbookCanCarryForward({...report,cash_state:{...report.cash_state,saved:false}}))throw Error('La caja ha cambiado durante la confirmación. Revisa el Resumen de caja antes de cerrar.');
   }
-  try{await Promise.race([sendParkingPrint('cashbook',buildCashbookHtml(report),true),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora no responde')),8000))]);}catch(printError){console.warn('Impresión de caja fallida, cierre continúa',printError);}
+  try{await attachCashbookSheetNumber(report);await Promise.race([sendParkingPrint('cashbook',buildCashbookHtml(report),true),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora no responde')),8000))]);}catch(printError){console.warn('Impresión de caja fallida, cierre continúa',printError);}
   try{await Promise.race([printTotalStays(true),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora de estancias no responde')),15000))]);}catch(printError){console.warn('Impresión de estancias fallida, cierre continúa',printError);}
   const res=await db.rpc('parking_close_cash_shift',{p_shift_id:shift.id,p_expected:report});if(res.error)throw Error('No se pudo cerrar el turno: '+res.error.message);
   sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload();
