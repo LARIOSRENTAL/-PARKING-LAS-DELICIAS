@@ -64,7 +64,7 @@ function cashBreakdownGroup(state,group){
  return result;
 }
 function renderCashDenominationSummary(state){
- const group=(key,title)=>{const defs=cashDenominations(key),values=cashBreakdownGroup(state,key);return '<table class="denomination-table"><thead><tr><th colspan="'+defs.length+'">'+title+'</th></tr><tr>'+defs.map(([,label])=>'<th>'+esc(label)+'</th>').join('')+'</tr></thead><tbody><tr>'+defs.map(([code])=>'<td>'+money(values[code])+'</td>').join('')+'</tr>'+(values.unallocated?'<tr><td colspan="'+defs.length+'">Importe anterior sin desglosar: '+money(values.unallocated)+'</td></tr>':'')+'<tr class="denomination-total"><th colspan="'+(defs.length-2)+'">TOTAL '+title+'</th><td colspan="2">'+money(state[key]||0)+'</td></tr></tbody></table>'};
+ const group=(key,title)=>{const defs=cashDenominations(key),values=cashBreakdownGroup(state,key);return '<table class="denomination-table"><thead><tr><th colspan="'+defs.length+'">'+title+'</th></tr><tr>'+defs.map(([,label])=>'<th>'+esc(label)+'</th>').join('')+'</tr></thead><tbody><tr>'+defs.map(([code])=>'<td>'+money(values[code])+'</td>').join('')+'</tr>'+(values.unallocated?'<tr><td colspan="'+defs.length+'">Importe anterior sin desglosar: '+money(values.unallocated)+'</td></tr>':'')+'<tr class="denomination-total"><th colspan="'+(defs.length-2)+'">TOTAL '+title+'</th><td colspan="2">'+money(cashDenominations(key).reduce((sum,[denom])=>sum+Number(values[denom]||0),0)+Number(values.unallocated||0))+'</td></tr></tbody></table>'};
  return group('loose_coins','MONEDAS SUELTAS')+group('wrapped_coins','MONEDAS EMPAQUETADAS')+group('banknotes','BILLETES SUELTOS')+group('packed_banknotes','BILLETES EMPAQUETADOS');
 }
 function renderCashbookSummary(data){
