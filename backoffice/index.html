@@ -181,8 +181,10 @@ async function boot(){
   mType.innerHTML=vehicleTypes.map(v=>'<option value="'+v.id+'">'+esc(v.name)+'</option>').join('');
   rotTariff.innerHTML=orderedRotationTariffs().map(t=>'<option value="'+esc(t.code)+'">'+esc(t.name)+' · máx. '+money(t.daily_cap_eur)+'/día'+(t.calculation_ready?'':' · TRAMOS PENDIENTES')+'</option>').join('');
   mDays.innerHTML=Array.from({length:24},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+' '+(i?'días':'día')+'</option>').join('');
-  const d=new Date();mEntry.value=localInput(d);mType.value=vehicleTypes.find(v=>v.code==='XL')?.id||mType.value;await loadParkingHotels();configureManualDatePolicy();updateManualPrice();updateManualPaymentUI();spotPlanDate.value=localInput(new Date()).slice(0,10);configureRatesAccess();
-  renderShiftState();await refreshAll();restoreParkingNavigation()
+  const d=new Date();mEntry.value=localInput(d);mType.value=vehicleTypes.find(v=>v.code==='XL')?.id||mType.value;configureManualDatePolicy();updateManualPrice();updateManualPaymentUI();spotPlanDate.value=localInput(new Date()).slice(0,10);configureRatesAccess();
+  renderShiftState();restoreParkingNavigation();ensurePlanningRefresh();
+  // Render the working area first; fetch nonessential dashboards only when visited.
+  if(document.querySelector('.mainNav button.active')?.dataset.area==='rotation')initRotation();
 }
 async function loadShiftState(){const r=await db.rpc('get_current_staff_shift');if(r.error)return;currentShift=r.data?.open?r.data:null;renderShiftState()}
 function shiftDateText(v){if(!v)return '';const d=new Date(v+'T12:00:00');return d.toLocaleDateString('es-ES')}
@@ -268,7 +270,7 @@ document.addEventListener('click',function(ev){
   if(operationalActions.some(fn=>code.includes(fn+'('))){ev.preventDefault();ev.stopImmediatePropagation();alert('Acceso libre de gerente: modo de consulta. Para realizar operaciones debes entrar en turno.')}} ,true);
 function configureManualDatePolicy(){const el=document.getElementById('manualDatePolicy');const input=document.getElementById('mEntry');if(!el||!input)return;input.removeAttribute('min');el.textContent='Todos los usuarios del backoffice pueden crear reservas con fechas pasadas, actuales o futuras.'}
 function ensurePlanningRefresh(){if(planningRefreshTimer)return;planningRefreshTimer=setInterval(async()=>{const active=document.querySelector('.mainNav button.active')?.dataset.area;if(active==='spots'){await loadReservations();await loadInside();await loadSpots()}},60000)}
-async function refreshAll(){ensurePlanningRefresh();if(typeof refreshSubscriberDeadlineAlerts==='function')await refreshSubscriberDeadlineAlerts();await loadCapacityBlocks();await Promise.all([loadReservations(),loadInside()]);await loadOutside();await Promise.all([loadDashboard(),loadSpots()]);if(currentStayTab==='totalStays')renderTotalStays()}
+async function refreshAll(){ensurePlanningRefresh();const active=document.querySelector('.mainNav button.active')?.dataset.area;await Promise.all([loadReservations(),loadInside()]);if(active==='stays'){if(currentStayTab==='outside'||currentStayTab==='totalStays')await loadOutside();if(currentStayTab==='dashboard')await loadDashboard();if(currentStayTab==='totalStays')renderTotalStays()}if(active==='spots')await loadSpots();if(active==='rotation')await initRotation();}
 let currentStayTab='dashboard';
 const PARKING_NAV_AREAS=['rotation','stays','subscribers','spots','cashbook','withdrawals','blacklist','rates','users','myUser','billing'];
 const PARKING_NAV_STAY_TABS=['dashboard','manual','reservations','hotelStays','totalStays','inside','outside'];
