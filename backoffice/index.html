@@ -183,8 +183,6 @@ async function boot(){
   mDays.innerHTML=Array.from({length:24},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+' '+(i?'días':'día')+'</option>').join('');
   const d=new Date();mEntry.value=localInput(d);mType.value=vehicleTypes.find(v=>v.code==='XL')?.id||mType.value;configureManualDatePolicy();updateManualPrice();updateManualPaymentUI();spotPlanDate.value=localInput(new Date()).slice(0,10);configureRatesAccess();
   renderShiftState();restoreParkingNavigation();ensurePlanningRefresh();
-  // Render the working area first; fetch nonessential dashboards only when visited.
-  if(document.querySelector('.mainNav button.active')?.dataset.area==='rotation')initRotation();
 }
 async function loadShiftState(){const r=await db.rpc('get_current_staff_shift');if(r.error)return;currentShift=r.data?.open?r.data:null;renderShiftState()}
 function shiftDateText(v){if(!v)return '';const d=new Date(v+'T12:00:00');return d.toLocaleDateString('es-ES')}
