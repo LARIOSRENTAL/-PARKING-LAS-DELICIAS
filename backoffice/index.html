@@ -321,7 +321,7 @@ async function connectParkingQz(){
  try{await qz.websocket.connect({retries:1,delay:1})}
  catch(e){throw new Error('No se pudo conectar con QZ Tray desde el backoffice: '+(e.message||e)+'. Revisa si Chrome pide permiso para acceder a dispositivos de la red local.')}
 }
-function hotelCouponPrintPages(html){const doc=new DOMParser().parseFromString(html,'text/html');const coupons=Array.from(doc.querySelectorAll('.coupon'));if(!coupons.length)throw new Error('No se encontraron bonos de hotel para imprimir.');return coupons.map(coupon=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+coupon.outerHTML+'<script src="authorized-plates.js?v=authorized-20261022"></script></body></html>')}
+function hotelCouponPrintPages(html){const doc=new DOMParser().parseFromString(html,'text/html');const coupons=Array.from(doc.querySelectorAll('.coupon'));if(!coupons.length)throw new Error('No se encontraron bonos de hotel para imprimir.');return coupons.map(coupon=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+coupon.outerHTML+'</body></html>')}
 async function sendParkingPrint(kind,html,officeOnly=false){
  if(!officeOnly&&typeof shouldPreviewParkingPrint==='function'&&shouldPreviewParkingPrint())return prepareAdminPrintPreview(kind,html);
  await connectParkingQz();
@@ -675,6 +675,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="blacklist.js?v=20261015"></script>
 <script src="hotel-vouchers.js?v=stay-flow-20261019-conversion-print-20261019-voucher-enter-20261016"></script>
 <script src="bank-invoice-mail.js?v=subscriber-method-20261017"></script>
+<script src="authorized-plates.js?v=authorized-20261022"></script>
 <script src="hotel-payments.js?v=available-20261017-pending-20261016"></script>
 <script src="stay-completion.js?v=early-release-and-plaza-sort-20261021"></script>
 <script src="staff-users.js?v=access-20261017-users-20261016"></script>
