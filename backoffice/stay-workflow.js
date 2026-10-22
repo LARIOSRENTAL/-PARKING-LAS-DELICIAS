@@ -69,16 +69,22 @@ async function printStayEditVoucher(reservation,change=null){
  const session=insideSessions.find(x=>x.reservation_id===reservation.id);
  let html=buildVoucherHtml(reservation,spot,session?.actual_entry_at||reservation.entry_at,null);
  if(change){
-  const original=Number(change.before_data?.amount_eur||0),paid=Number(change.amount_eur||0),total=Number(reservation.amount_eur||0);
-  const count=(Number(reservation.duration_days||0)-Number(change.before_data?.duration_days||0));
-  const detail='<section style="font: bold 13px Arial;text-align:center;padding:3mm;border:1px solid #333;margin:2mm">AMPLIACIÓN '+(count>0?'DE '+count+' DÍA(S)':'/ MODIFICACIÓN')+' · IMPORTE AMPLIACIÓN: '+money(paid)+' · PRECIO TOTAL: '+money(total)+'</section>';
-  html=html.replace('</body>',detail+'</body>');
+  const changes=await db.from('parking_stay_changes').select('id,created_at').eq('reservation_id',reservation.id).order('created_at',{ascending:true});
+  const position=changes.error?1:Math.max(1,(changes.data||[]).findIndex(x=>x.id===change.id)+1);
+  const added=Number(reservation.duration_days||0)-Number(change.before_data?.duration_days||0);
+  const due=Number(change.amount_eur||0),total=Number(reservation.amount_eur||0);
+  const detail='<div style="font: bold 12px Arial;text-align:center;border:1px solid #333;padding:2mm;margin:2mm auto;width:85mm">AMPLIACIÓN Nº '+position+(added>0?' · '+added+' DÍA(S)':'')+'<div>PRECIO AMPLIACIÓN: '+money(due)+'</div><div>PRECIO TOTAL: '+money(total)+'</div></div>';
+  html=html.replace('<div class="bar">ABONO POR DÍAS</div>','<div class="bar">ABONO POR DÍAS</div>'+detail);
  }
  await sendParkingPrint('stay',html);
 }
 async function reprintCurrentStayEdit(){
- const r=stayEditState?.reservation;if(!r)return;
- try{await printStayEditVoucher(r)}catch(e){alert('No se pudo reimprimir el bono: '+e.message)}
+ const id=stayEditState?.reservation?.id;if(!id)return;
+ try{
+  const r=await db.from('parking_stay_changes').select('*').eq('reservation_id',id).order('created_at',{ascending:false}).limit(1);
+  if(r.error)throw r.error;
+  await printStayEditVoucher(stayEditState.reservation,r.data?.[0]||null);
+ }catch(e){alert('No se pudo reimprimir el bono: '+e.message)}
 }
 async function saveStayEdit(){
  const state=stayEditState;if(!state||state.busy||!state.quoteReady)return;const b=opsEl('stayEditSave');state.busy=true;b.disabled=true;let saved=false;
