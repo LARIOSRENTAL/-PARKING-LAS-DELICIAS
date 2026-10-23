@@ -1,4 +1,4 @@
-/* Acceso limitado de Refuerzo. Las operaciones se validan en RPC con código temporal. */
+/* Acceso limitado de Refuerzo. La clave fija se valida en servidor y crea una sesión temporal. */
 const reinforcementDb = window.supabase.createClient(
   'https://vcwbfljcqpqkmuzcpboi.supabase.co',
   'sb_publishable_is9ITJdQMbieunMWrv6g8A_2OdrO3xe',
@@ -25,14 +25,16 @@ async function reCall(name, args) {
 }
 async function enter() {
   const button = document.querySelector('#login button');
-  const code = reEl('code').value.trim();
+  const pin = reEl('code').value.trim();
   reEl('loginError').textContent = '';
-  if (!code) { reEl('loginError').textContent = 'Introduce el código temporal.'; return; }
+  if (!pin) { reEl('loginError').textContent = 'Introduce la clave de acceso.'; return; }
   button.disabled = true;
   try {
-    const data = await reCall('parking_reinforcement_options', {p_code:code});
+    const session = await reCall('parking_reinforcement_login', {p_pin:pin});
+    if (!session || !session.code) throw new Error('No se pudo iniciar la sesión de Refuerzo.');
+    const data = await reCall('parking_reinforcement_options', {p_code:session.code});
     if (!data || !Array.isArray(data.tariffs) || !Array.isArray(data.types)) throw new Error('No se pudieron cargar las opciones de trabajo.');
-    reinforcementCode = code;
+    reinforcementCode = session.code;
     reinforcementData = data;
     reEl('tariff').innerHTML = data.tariffs.map(t => '<option value="' + reEscape(t.code) + '">' + reEscape(t.name) + '</option>').join('');
     reEl('type').innerHTML = data.types.map(t => '<option value="' + reEscape(t.id) + '">' + reEscape(t.name) + '</option>').join('');
