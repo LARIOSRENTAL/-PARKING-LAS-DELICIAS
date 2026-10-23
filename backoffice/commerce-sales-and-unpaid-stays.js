@@ -36,7 +36,7 @@ reservationTable=function(rows,actions=false){
  for(const r of rows){
   const paid=r.payment_status==='paid',prefix="onclick=\"checkIn('"+r.id+"')\"";
   h=h.replace(prefix+'\u003eMarcar entrada',paid?prefix+'>Dar entrada':"onclick=\"openStayCollection('"+r.id+"')\">Cobrar y dar entrada");
-  if(!paid)h=h.replace("onclick=\"openStayCollection('"+r.id+"')\">Ticket de cobro","");
+  if(!paid){h=h.replace("onclick=\"openStayCollection('"+r.id+"')\">Cobrar reserva","onclick=\"openStayCollection('"+r.id+"')\" style=\"display:none\">Cobrar reserva");}
   const status=paid?'PAGADO':'PENDIENTE DE PAGO';
   const pos=h.indexOf('>'+esc(r.reference)+'</b>'); // status changes only in matching row via status cell
   const marker='<td>'+statusTag(r.status)+'</td>';
@@ -49,10 +49,11 @@ openStayCollection=function(id){
  const spot=document.getElementById('spot-'+id)?.value;if(!spot)return alert('Selecciona una plaza antes de cobrar y dar entrada.');
  window.stayPaymentCurrent={id,spot,entry:r.entry_at,type:r.vehicle_type_id};
  opsModal('Cobrar reserva y dar entrada · '+r.reference,
- '<div class="grid2"><div class="field"><label>Días de estancia</label><input id="stayCollectDays" type="number" min="1" max="24" value="'+Number(r.duration_days)+'" onchange="updateCombinedStayPayment()"></div><div class="field"><label>Fin previsto</label><input id="stayCollectEnd" type="datetime-local" readonly></div></div><div id="stayCollectPrice" style="font-size:22px;font-weight:bold"></div><div class="field"><label>Forma de pago</label><select id="stayCollectMethod" onchange="updateCombinedStayPayment()"><option value="cash">Efectivo</option><option value="card">Tarjeta</option><option value="hotel_voucher">Bonos hotel</option><option value="hotel_voucher_old">Bonos hotel antiguos</option></select></div><div id="stayCollectVouchers"></div><label id="stayCollectPrintWrap"><input type="checkbox" id="stayCollectPrint" style="width:auto"> Imprimir ticket de cobro</label>',
+ '<div class="grid2"><div class="field"><label>Días de estancia</label><input id="stayCollectDays" type="number" min="1" max="24" value="'+Number(r.duration_days)+'" onchange="updateCombinedStayPayment()"></div><div class="field"><label>Fin previsto</label><input id="stayCollectEnd" type="datetime-local" onchange="stayEndChanged()"></div></div><div id="stayCollectPrice" style="font-size:22px;font-weight:bold"></div><div class="field"><label>Forma de pago</label><select id="stayCollectMethod" onchange="updateCombinedStayPayment()"><option value="cash">Efectivo</option><option value="card">Tarjeta</option><option value="hotel_voucher">Bonos hotel</option><option value="hotel_voucher_old">Bonos hotel antiguos</option></select></div><div id="stayCollectVouchers"></div><label id="stayCollectPrintWrap"><input type="checkbox" id="stayCollectPrint" style="width:auto"> Imprimir ticket de cobro</label>',
  '<button class="btn green" id="stayCollectConfirm" onclick="confirmCombinedStayPayment()">Cobrar y dar entrada</button>');
  updateCombinedStayPayment();
 };
+function stayEndChanged(){const ctx=window.stayPaymentCurrent;if(!ctx)return;const entry=new Date(ctx.entry).getTime(),end=new Date(opsEl('stayCollectEnd').value).getTime();if(!Number.isFinite(end)||end<=entry)return;opsEl('stayCollectDays').value=Math.ceil((end-entry)/86400000);updateCombinedStayPayment()}
 async function updateCombinedStayPayment(){
  const ctx=window.stayPaymentCurrent;if(!ctx)return;
  const days=Number(opsEl('stayCollectDays').value),method=opsEl('stayCollectMethod').value;
