@@ -321,7 +321,7 @@ async function connectParkingQz(){
  try{await qz.websocket.connect({retries:1,delay:1})}
  catch(e){throw new Error('No se pudo conectar con QZ Tray desde el backoffice: '+(e.message||e)+'. Revisa si Chrome pide permiso para acceder a dispositivos de la red local.')}
 }
-function hotelCouponPrintPages(html){const doc=new DOMParser().parseFromString(html,'text/html');const coupons=Array.from(doc.querySelectorAll('.coupon'));if(!coupons.length)throw new Error('No se encontraron bonos de hotel para imprimir.');return coupons.map(coupon=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+coupon.outerHTML+'<div id="reinforcementCodeModal" class="modalBack hidden"><div class="modalCard" style="max-width:540px"><div class="modalHead"><h3>Código temporal Refuerzo</h3><button class="btn light" onclick="closeReinforcementCode()">Cerrar</button></div><div class="modalBody"><p>Este código permite acceder al modo Refuerzo durante 8 horas. Compártelo solo con la persona que va a realizar las entradas.</p><div class="field"><label for="reinforcementCodeValue">Código</label><input id="reinforcementCodeValue" readonly></div><p id="reinforcementCodeExpires" class="muted"></p><button class="btn dark" onclick="copyReinforcementCode()">Copiar código</button><div id="reinforcementCodeMessage" role="status"></div></div></div></div><script src="reinforcement-admin.js?v=20261023"></script></body></html>')}
+function hotelCouponPrintPages(html){const doc=new DOMParser().parseFromString(html,'text/html');const coupons=Array.from(doc.querySelectorAll('.coupon'));if(!coupons.length)throw new Error('No se encontraron bonos de hotel para imprimir.');return coupons.map(coupon=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+coupon.outerHTML+'<div id="reinforcementCodeModal" class="modalBack hidden"><div class="modalCard" style="max-width:540px"><div class="modalHead"><h3>Código temporal Refuerzo</h3><button class="btn light" onclick="closeReinforcementCode()">Cerrar</button></div><div class="modalBody"><p>Este código permite acceder al modo Refuerzo durante 8 horas. Compártelo solo con la persona que va a realizar las entradas.</p><div class="field"><label for="reinforcementCodeValue">Código</label><input id="reinforcementCodeValue" readonly></div><p id="reinforcementCodeExpires" class="muted"></p><button class="btn dark" onclick="copyReinforcementCode()">Copiar código</button><div id="reinforcementCodeMessage" role="status"></div></div></div></div></body></html>')}
 async function sendParkingPrint(kind,html,officeOnly=false){
  if(!officeOnly&&typeof shouldPreviewParkingPrint==='function'&&shouldPreviewParkingPrint())return prepareAdminPrintPreview(kind,html);
  await connectParkingQz();
@@ -675,6 +675,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="blacklist.js?v=20261015"></script>
 <script src="hotel-vouchers.js?v=stay-flow-20261019-conversion-print-20261019-voucher-enter-20261016"></script>
 <script src="bank-invoice-mail.js?v=subscriber-method-20261017"></script>
+<script src="reinforcement-admin.js?v=20261023"></script>
 <script src="authorized-plates.js?v=all-staff-20261022"></script>
 <script src="hotel-payments.js?v=available-20261017-pending-20261016"></script>
 <script src="stay-completion.js?v=early-release-and-plaza-sort-20261021"></script>
