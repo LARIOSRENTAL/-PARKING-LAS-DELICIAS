@@ -32,27 +32,53 @@ createManualReservation=async function(){
 };
 const previousReservationTable=reservationTable;
 reservationTable=function(rows,actions=false){
- let html=previousReservationTable(rows,actions);
- if(actions)for(const r of rows){if(r.payment_status!=='paid'&&r.payment_method!=='hotel_voucher')html=html.replace('onclick="openStayCollection(\''+r.id+'\')">Ticket de cobro','onclick="openStayCollection(\''+r.id+'\')">Cobrar reserva')}
- return html;
+ let h=previousReservationTable(rows,actions);if(!actions)return h;
+ for(const r of rows){
+  const paid=r.payment_status==='paid',prefix="onclick=\"checkIn('"+r.id+"')\"";
+  h=h.replace(prefix+'\u003eMarcar entrada',paid?prefix+'>Dar entrada':"onclick=\"openStayCollection('"+r.id+"')\">Cobrar y dar entrada");
+  if(!paid)h=h.replace("onclick=\"openStayCollection('"+r.id+"')\">Ticket de cobro","");
+  const status=paid?'PAGADO':'PENDIENTE DE PAGO';
+  const pos=h.indexOf('>'+esc(r.reference)+'</b>'); // status changes only in matching row via status cell
+  const marker='<td>'+statusTag(r.status)+'</td>';
+  if(h.includes(marker))h=h.replace(marker,'<td><span class="tag '+(paid?'green':'red')+'">'+status+'</span></td>');
+ }
+ return h;
 };
 openStayCollection=function(id){
- const r=reservations.find(x=>x.id===id);if(!r)return;
- const paid=r.payment_status==='paid';
- opsModal(paid?'Reimprimir ticket':'Cobrar reserva · '+r.reference,'<p><b>'+esc(r.plate)+' · '+money(r.amount_eur)+'</b></p><div class="field"><label>Forma de pago</label><select id="stayCollectMethod" '+(paid?'disabled':'')+' onchange="stayCollectionMethodChanged()"><option value="cash">Efectivo</option><option value="card">Tarjeta</option><option value="hotel_voucher">Bonos hotel</option></select></div><div class="field hidden" id="stayCollectVouchers"><label>Códigos de bonos hotel (uno por línea o escanear)</label><textarea id="stayCollectCodes" rows="4"></textarea></div><label><input type="checkbox" style="width:auto" id="stayCollectPrint"> Imprimir ticket</label>','<button class="btn green" id="stayCollectConfirm" onclick="confirmStayPaymentNew(\''+id+'\')">'+(paid?'Reimprimir':'Confirmar cobro')+'</button>');
- opsEl('stayCollectMethod').value=paid?r.payment_method||'cash':'cash';opsEl('stayCollectPrint').checked=paid;stayCollectionMethodChanged();
+ const r=reservations.find(x=>x.id===id);if(!r)return;const paid=r.payment_status==='paid';if(paid)return;
+ const spot=document.getElementById('spot-'+id)?.value;if(!spot)return alert('Selecciona una plaza antes de cobrar y dar entrada.');
+ window.stayPaymentCurrent={id,spot,entry:r.entry_at,type:r.vehicle_type_id};
+ opsModal('Cobrar reserva y dar entrada · '+r.reference,
+ '<div class="grid2"><div class="field"><label>Días de estancia</label><input id="stayCollectDays" type="number" min="1" max="24" value="'+Number(r.duration_days)+'" onchange="updateCombinedStayPayment()"></div><div class="field"><label>Fin previsto</label><input id="stayCollectEnd" type="datetime-local" readonly></div></div><div id="stayCollectPrice" style="font-size:22px;font-weight:bold"></div><div class="field"><label>Forma de pago</label><select id="stayCollectMethod" onchange="updateCombinedStayPayment()"><option value="cash">Efectivo</option><option value="card">Tarjeta</option><option value="hotel_voucher">Bonos hotel</option><option value="hotel_voucher_old">Bonos hotel antiguos</option></select></div><div id="stayCollectVouchers"></div><label id="stayCollectPrintWrap"><input type="checkbox" id="stayCollectPrint" style="width:auto"> Imprimir ticket de cobro</label>',
+ '<button class="btn green" id="stayCollectConfirm" onclick="confirmCombinedStayPayment()">Cobrar y dar entrada</button>');
+ updateCombinedStayPayment();
 };
-function stayCollectionMethodChanged(){const hotel=opsEl('stayCollectMethod').value==='hotel_voucher';opsEl('stayCollectVouchers').classList.toggle('hidden',!hotel);opsEl('stayCollectPrint').closest('label').classList.toggle('hidden',hotel)}
-async function confirmStayPaymentNew(id){
- const b=opsEl('stayCollectConfirm');if(b.disabled)return;b.disabled=true;
+async function updateCombinedStayPayment(){
+ const ctx=window.stayPaymentCurrent;if(!ctx)return;
+ const days=Number(opsEl('stayCollectDays').value),method=opsEl('stayCollectMethod').value;
+ const voucher=method==='hotel_voucher'||method==='hotel_voucher_old';
+ opsEl('stayCollectPrice').classList.toggle('hidden',voucher);
+ opsEl('stayCollectPrintWrap').classList.toggle('hidden',voucher);
+ const end=new Date(new Date(ctx.entry).getTime()+days*86400000);
+ opsEl('stayCollectEnd').value=Number.isFinite(end.getTime())?localInput(end):'';
+ const wrapper=opsEl('stayCollectVouchers'),previous=[...wrapper.querySelectorAll('input')].map(x=>x.value);
+ wrapper.innerHTML=voucher&&Number.isInteger(days)&&days>0&&days<=24?Array.from({length:days},(_,i)=>'<div class="field"><label>Bono hotel día '+(i+1)+'</label><input class="stayVoucherNumber" placeholder="'+(method==='hotel_voucher'?'Escanear bono':'Número del bono antiguo')+'" value="'+esc(previous[i]||'')+'"></div>').join(''):'';
+ if(voucher){opsEl('stayCollectPrice').textContent='';return}
+ const quote=await db.rpc('parking_stay_price',{p_vehicle_type_id:ctx.type,p_days:days,p_entry_at:ctx.entry});
+ opsEl('stayCollectPrice').textContent=quote.error?'No se pudo calcular precio':money(quote.data);
+}
+async function confirmCombinedStayPayment(){
+ const ctx=window.stayPaymentCurrent;if(!ctx)return;
+ const button=opsEl('stayCollectConfirm');button.disabled=true;
  try{
- const method=opsEl('stayCollectMethod').value;let result;
- if(method==='hotel_voucher'){
- const raw=opsEl('stayCollectCodes').value;const codes=raw.split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean);
- const q=await db.rpc('parking_pay_stay_hotel_vouchers',{p_reservation_id:id,p_codes:codes});if(q.error)throw q.error;result=q.data;
- }else{
- const q=await db.rpc('parking_collect_stay',{p_reservation_id:id,p_payment_method:method,p_print_ticket:opsEl('stayCollectPrint').checked});if(q.error)throw q.error;result=q.data;
- }
- closeParkingOpsModal();await loadReservations();if(result?.receipt)await printParkingThermal(buildSimplifiedTicket(result.receipt));
- }catch(e){opsEl('parkingOpsMessage').textContent=e.message}finally{b.disabled=false}
+ const days=Number(opsEl('stayCollectDays').value),method=opsEl('stayCollectMethod').value,codes=[...document.querySelectorAll('.stayVoucherNumber')].map(x=>x.value.trim().toUpperCase());
+ if(!Number.isInteger(days)||days<1||days>24)throw Error('Introduce una duración válida.');
+ if(method.startsWith('hotel_voucher')&&(codes.length!==days||codes.some(x=>!x)||new Set(codes).size!==days))throw Error('Se necesita un número de bono distinto para cada día.');
+ const result=await db.rpc('parking_pay_and_enter_stay',{p_reservation_id:ctx.id,p_spot_id:ctx.spot,p_days:days,p_method:method,p_codes:codes,p_print_ticket:opsEl('stayCollectPrint').checked});
+ if(result.error)throw result.error;
+ closeParkingOpsModal();await refreshAll();
+ if(result.data.receipt)try{await printParkingThermal(buildSimplifiedTicket(result.data.receipt))}catch(e){alert('Entrada guardada; error al imprimir el ticket de cobro: '+e.message)}
+ const res=reservations.find(x=>x.id===ctx.id);
+ if(res)try{const ps=insideSessions.find(x=>x.reservation_id===ctx.id),sp=spots.find(x=>x.id===ctx.spot);await sendParkingPrint('stay',buildVoucherHtml(res,sp?.code||'',ps?.actual_entry_at||new Date().toISOString(),null))}catch(e){alert('Entrada y cobro guardados; error al imprimir el bono: '+e.message)}
+ }catch(e){opsEl('parkingOpsMessage').textContent=e.message}finally{button.disabled=false}
 }
