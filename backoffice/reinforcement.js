@@ -1,7 +1,8 @@
 /* Acceso limitado de Refuerzo. Las operaciones se validan en RPC con código temporal. */
 const reinforcementDb = window.supabase.createClient(
   'https://vcwbfljcqpqkmuzcpboi.supabase.co',
-  'sb_publishable_is9ITJdQMbieunMWrv6g8A_2OdrO3xe'
+  'sb_publishable_is9ITJdQMbieunMWrv6g8A_2OdrO3xe',
+  {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}}
 );
 let reinforcementCode = '';
 let reinforcementData = null;
