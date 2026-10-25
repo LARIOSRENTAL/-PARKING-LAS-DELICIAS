@@ -38,6 +38,8 @@ async function enter() {
     reinforcementData = data;
     reEl('tariff').innerHTML = data.tariffs.map(t => '<option value="' + reEscape(t.code) + '">' + reEscape(t.name) + '</option>').join('');
     reEl('type').innerHTML = data.types.map(t => '<option value="' + reEscape(t.id) + '">' + reEscape(t.name) + '</option>').join('');
+    const xlType = data.types.find(t => String(t.code || t.name || '').trim().toUpperCase() === 'XL');
+    if (xlType) reEl('type').value = String(xlType.id);
     reEl('days').innerHTML = Array.from({length:24}, (_,i) => '<option value="' + (i+1) + '">' + (i+1) + (i ? ' días' : ' día') + '</option>').join('');
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
