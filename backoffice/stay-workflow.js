@@ -73,8 +73,8 @@ async function printStayEditVoucher(reservation,change=null){
   const position=changes.error?1:Math.max(1,(changes.data||[]).findIndex(x=>x.id===change.id)+1);
   const added=Number(reservation.duration_days||0)-Number(change.before_data?.duration_days||0);
   const due=Number(change.amount_eur||0),total=Number(reservation.amount_eur||0);
-  const detail='<div style="font: bold 12px Arial;text-align:center;border:1px solid #333;padding:2mm;margin:2mm auto;width:85mm">AMPLIACIÓN Nº '+position+(added>0?' · '+added+' DÍA(S)':'')+'<div>PRECIO AMPLIACIÓN: '+money(due)+'</div><div>PRECIO TOTAL: '+money(total)+'</div></div>';
-  html=html.replace('<div class="bar">ABONO POR DÍAS</div>','<div class="bar">ABONO POR DÍAS</div>'+detail);
+  const rows='<tr><th>Ampliación</th><td>Nº '+position+(added>0?' · '+added+' día(s)':'')+'</td></tr><tr><th>Precio ampliación</th><td>'+money(due)+'</td></tr><tr><th>Precio total</th><td>'+money(total)+'</td></tr>';
+  html=html.replace('</table><div class="signature">',''+rows+'</table><div class="signature">');
  }
  await sendParkingPrint('stay',html);
 }
