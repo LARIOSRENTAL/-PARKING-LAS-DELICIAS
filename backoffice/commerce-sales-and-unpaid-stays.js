@@ -92,3 +92,36 @@ async function confirmCombinedStayPayment(){
  if(res)try{const ps=insideSessions.find(x=>x.reservation_id===ctx.id),sp=spots.find(x=>x.id===ctx.spot);await sendParkingPrint('stay',buildVoucherHtml(res,sp?.code||'',ps?.actual_entry_at||new Date().toISOString(),null))}catch(e){alert('Entrada y cobro guardados; error al imprimir el bono: '+e.message)}
  }catch(e){if(saved)alert('Cobro y entrada guardados. No repitas el cobro. '+e.message);else opsEl('parkingOpsMessage').textContent=e.message}finally{button.disabled=false}
 }
+
+/* Focus only on navigation; background refreshes never move the cursor. */
+function focusParkingEntryField(id){const field=document.getElementById(id);if(!field||field.disabled||!field.getClientRects().length)return;if([...document.querySelectorAll('.modalBack:not(.hidden)')].some(x=>x.getClientRects().length))return;field.focus({preventScroll:true});field.select?.()}
+const showParkingAreaBeforeEntryFocus=showArea;
+showArea=function(area){const result=showParkingAreaBeforeEntryFocus(area);if(area==='rotation'&&opsEl('rotation').classList.contains('active'))focusParkingEntryField('rotPlate');return result};
+const loadParkingStayTabBeforeEntryFocus=loadStayTab;
+loadStayTab=function(tab){const result=loadParkingStayTabBeforeEntryFocus(tab);if(tab==='manual'&&opsEl('manual').classList.contains('active'))focusParkingEntryField('mPlate');return result};
+
+// The previous hotel-payment shortcut targeted fields hidden in the unpaid form.
+if(typeof handleManualStayEnter==='function')document.removeEventListener('keydown',handleManualStayEnter,true);
+function manualStayKeyboardFields(){const ids=['mPlate','mModel','mType','mEntry','mDays','mExit','mNotes','mName','mPhone','mEmail'];return ids.map(id=>document.getElementById(id)).concat(document.querySelector('#manual button[onclick="createManualReservation()"]')).filter(x=>x&&!x.disabled&&!x.readOnly&&!x.closest('details:not([open])')&&x.getClientRects().length)}
+function validateManualStayKeyboardField(field){
+ const message=opsEl('manualMsg');let error='';
+ if(field.id==='mPlate'&&normalizeRotationPlate(field.value).length<3)error='Introduce una matrícula válida.';
+ if(field.id==='mModel'&&field.value.trim().length<2)error='Introduce la marca / modelo.';
+ if(['mType','mEntry','mDays','mExit'].includes(field.id))field.dispatchEvent(new Event('change',{bubbles:true}));
+ if(['mEntry','mDays','mExit'].includes(field.id)){try{readManualStayDates()}catch(e){error=e.message}}
+ if(error){message.textContent=error;field.focus();return false}
+ if(!field.checkValidity()){field.reportValidity();return false}
+ message.textContent='';return true;
+}
+document.addEventListener('keydown',event=>{
+ if(event.key!=='Enter'||event.isComposing||event.ctrlKey||event.altKey||event.metaKey||!event.target?.closest('#manual')||!opsEl('manual').classList.contains('active'))return;
+ const fields=manualStayKeyboardFields(),index=fields.indexOf(event.target);if(index<0)return;
+ event.preventDefault();event.stopImmediatePropagation();if(event.repeat||manualStayCreateBusy)return;
+ if(event.shiftKey){fields[Math.max(0,index-1)]?.focus();return}
+ if(!validateManualStayKeyboardField(event.target))return;
+ if(event.target.tagName==='BUTTON'){event.target.click();return}
+ fields[index+1]?.focus();
+},true);
+
+const manualEntryCreateButton=document.querySelector('#manual button[onclick="createManualReservation()"]');
+if(manualEntryCreateButton&&!document.getElementById('manualEntryKeyboardHint')){const hint=document.createElement('small');hint.id='manualEntryKeyboardHint';hint.className='muted';hint.style.cssText='display:block;margin-top:6px';hint.textContent='Intro: avanzar al siguiente campo. En Crear estancia, Intro confirma.';manualEntryCreateButton.insertAdjacentElement('afterend',hint)}
