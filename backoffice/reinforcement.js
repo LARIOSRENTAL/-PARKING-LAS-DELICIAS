@@ -7,6 +7,7 @@ const reinforcementDb = window.supabase.createClient(
 let reinforcementCode = '';
 let reinforcementData = null;
 let lastReinforcementTicket = null;
+async function reloadReinforcementSpots(){if(!reinforcementCode)return;const options=await reCall('parking_reinforcement_options',{p_code:reinforcementCode});reinforcementData=options;const tariff=reEl('tariff').value;const previous=reEl('spot').value;const free=(options.spots||[]).filter(s=>(s.tariffs||[]).includes(tariff));reEl('spot').innerHTML='<option value="">Selecciona plaza libre</option>'+free.map(s=>'<option value="'+reEscape(s.code)+'">'+reEscape(s.code)+'</option>').join('');if(free.some(s=>s.code===previous))reEl('spot').value=previous;}
 const reEl = id => document.getElementById(id);
 function reEscape(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -36,6 +37,8 @@ async function enter() {
     if (!data || !Array.isArray(data.tariffs) || !Array.isArray(data.types)) throw new Error('No se pudieron cargar las opciones de trabajo.');
     reinforcementCode = session.code;
     reinforcementData = data;
+    reEl('tariff').addEventListener('change',()=>reloadReinforcementSpots().catch(e=>reShowMessage(e.message,true)));
+    await reloadReinforcementSpots();
     reEl('tariff').innerHTML = data.tariffs.map(t => '<option value="' + reEscape(t.code) + '">' + reEscape(t.name) + '</option>').join('');
     reEl('type').innerHTML = data.types.map(t => '<option value="' + reEscape(t.id) + '">' + reEscape(t.name) + '</option>').join('');
     const xlType = data.types.find(t => String(t.code || t.name || '').trim().toUpperCase() === 'XL');
@@ -90,7 +93,7 @@ async function rotationEntry() {
     });
     reShowMessage('Entrada registrada para ' + result.plate + ' · plaza ' + result.spot + '. Preparando ticket…', false);
     reEl('plate').value = '';
-    reEl('spot').value = '';
+    await reloadReinforcementSpots();
     reEl('client').value = '';
     printReinforcementTicket(result);
   } catch (error) {
