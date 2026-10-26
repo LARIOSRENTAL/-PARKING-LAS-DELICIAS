@@ -39,12 +39,17 @@ async function saveParkingRate(){
  }catch(e){document.getElementById('rateEditorMessage').textContent='No se guardó la tarifa: '+e.message}finally{b.disabled=false}
 }
 async function deleteRatePeriod(id){if(!canManageRates()||!confirm('¿Eliminar esta tarifa por fechas? Se volverá a usar la tarifa base.'))return;const r=await db.from('parking_rate_periods').delete().eq('id',id);if(r.error)return alert(r.error.message);await loadRateConfiguration()}
-let manualPriceRequest=0;
+let manualPriceRequest=0,manualStayExitIsCustom=false;
+function openManualExitCalendar(){const field=document.getElementById('mExit');try{if(typeof field.showPicker==='function'){field.showPicker();return}}catch(e){}field.focus();field.click()}
+function manualStayBasisChanged(){manualStayExitIsCustom=false;return updateManualPrice()}
+function manualStayExitChanged(){manualStayExitIsCustom=true;return updateManualPrice()}
+function readManualStayDates(){const entry=new Date(document.getElementById('mEntry').value),exit=new Date(document.getElementById('mExit').value),days=Math.ceil((exit-entry)/86400000);if(!Number.isFinite(entry.getTime())||!Number.isFinite(exit.getTime())||exit<=entry)throw Error('La fecha de salida debe ser posterior a la entrada.');if(days<1||days>24)throw Error('La estancia debe durar entre 1 y 24 días.');return{entry,exit,days}}
 async function updateManualPrice(){
- const exitField=document.getElementById('mExit'),entry=new Date(document.getElementById('mEntry')?.value),days=Number(document.getElementById('mDays')?.value);if(exitField)exitField.value=Number.isFinite(entry.getTime())&&Number.isInteger(days)&&days>0?localInput(new Date(entry.getTime()+days*86400000)):'';
+ const serial=++manualPriceRequest,exitField=document.getElementById('mExit'),entry=new Date(document.getElementById('mEntry')?.value),selectedDays=Number(document.getElementById('mDays')?.value),weekday=document.getElementById('mExitWeekday');
+ if(exitField&&!manualStayExitIsCustom)exitField.value=Number.isFinite(entry.getTime())&&Number.isInteger(selectedDays)&&selectedDays>0?localInput(new Date(entry.getTime()+selectedDays*86400000)):'';
  const field=document.getElementById('mPrice');if(!field||!mType?.value||!mDays?.value||!mEntry?.value)return;
- const serial=++manualPriceRequest;
- const r=await db.rpc('parking_stay_price',{p_vehicle_type_id:mType.value,p_days:Number(mDays.value),p_entry_at:new Date(mEntry.value).toISOString()});
+ let dates;try{dates=readManualStayDates();mDays.value=String(dates.days);exitField.setCustomValidity('');if(weekday)weekday.textContent=dates.exit.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}catch(e){field.value='';exitField.setCustomValidity(e.message);if(weekday)weekday.textContent=e.message;return}
+ const r=await db.rpc('parking_stay_price',{p_vehicle_type_id:mType.value,p_days:dates.days,p_entry_at:dates.entry.toISOString()});
  if(serial!==manualPriceRequest)return;
  if(r.error){field.value='';document.getElementById('manualMsg').textContent='No se pudo calcular la tarifa: '+r.error.message;return}
  if(r.data!==null)field.value=Number(r.data).toFixed(2);

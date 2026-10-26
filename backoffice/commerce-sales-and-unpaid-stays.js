@@ -26,8 +26,9 @@ createManualReservation=async function(){
  if(plate.length<3||model.length<2)return msg.textContent='Completa matrícula y marca/modelo.';
  manualStayCreateBusy=true;if(b)b.disabled=true;
  try{
+ const dates=readManualStayDates();
  pendingStayCreateId=pendingStayCreateId||crypto.randomUUID();
- const r=await db.rpc('parking_create_unpaid_stay',{p_request_id:pendingStayCreateId,p_data:{plate,model,vehicle_type_id:opsEl('mType').value,entry_at:new Date(opsEl('mEntry').value).toISOString(),days:Number(opsEl('mDays').value),name:opsEl('mName').value,phone:opsEl('mPhone').value,email:opsEl('mEmail').value,notes:opsEl('mNotes').value}});
+ const r=await db.rpc('parking_create_unpaid_stay',{p_request_id:pendingStayCreateId,p_data:{plate,model,vehicle_type_id:opsEl('mType').value,entry_at:dates.entry.toISOString(),exit_at:dates.exit.toISOString(),days:dates.days,name:opsEl('mName').value,phone:opsEl('mPhone').value,email:opsEl('mEmail').value,notes:opsEl('mNotes').value}});
  if(r.error)throw r.error;pendingStayCreateId=null;
  msg.textContent='Reserva '+r.data.reference+' creada, pendiente de cobro.';
  for(const id of ['mName','mPhone','mEmail','mPlate','mModel','mNotes'])opsEl(id).value='';
