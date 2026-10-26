@@ -38,8 +38,8 @@ async function enter() {
     reinforcementCode = session.code;
     reinforcementData = data;
     reEl('tariff').addEventListener('change',()=>reloadReinforcementSpots().catch(e=>reShowMessage(e.message,true)));
-    await reloadReinforcementSpots();
     reEl('tariff').innerHTML = data.tariffs.map(t => '<option value="' + reEscape(t.code) + '">' + reEscape(t.name) + '</option>').join('');
+    await reloadReinforcementSpots();
     reEl('type').innerHTML = data.types.map(t => '<option value="' + reEscape(t.id) + '">' + reEscape(t.name) + '</option>').join('');
     const xlType = data.types.find(t => String(t.code || t.name || '').trim().toUpperCase() === 'XL');
     if (xlType) reEl('type').value = String(xlType.id);
@@ -60,21 +60,11 @@ function tab(name) {
   reEl('rotation').classList.toggle('hidden', name !== 'rotation');
   reEl('stay').classList.toggle('hidden', name !== 'stay');
 }
-function printReinforcementTicket(ticket) {
-  lastReinforcementTicket = ticket;
-  const time = reDate(ticket.entry_at);
-  reEl('ticket').innerHTML =
-    '<div style="text-align:center;font-weight:bold;font-size:17px">PARKING LAS DELICIAS</div>' +
-    '<div style="text-align:center;margin:3px 0 10px">C/ Don Rodrigo nº 3 · Málaga</div>' +
-    '<hr><div style="text-align:center;font-size:16px;font-weight:bold">TICKET DE ENTRADA</div>' +
-    '<p><b>Nº:</b> ' + reEscape(ticket.ticket_number) + '</p>' +
-    '<p><b>Matrícula:</b> ' + reEscape(ticket.plate) + '</p>' +
-    '<p><b>Tarifa:</b> ' + reEscape(ticket.tariff) + '</p>' +
-    '<p><b>Plaza:</b> ' + reEscape(ticket.spot) + '</p>' +
-    '<p><b>Entrada:</b> ' + reEscape(time) + '</p>' +
-    '<hr><div style="text-align:center">Conserve este ticket hasta la salida.</div>';
-  reEl('ticketWrap').classList.remove('hidden');
-  window.setTimeout(() => window.print(), 250);
+async function printReinforcementTicket(ticket) {
+ lastReinforcementTicket=ticket;
+ const html=buildRotationEntryTicket({...ticket,spot_code:ticket.spot,key_number:ticket.spot,leaves_keys:!['A','M'].includes(String(ticket.spot||'').split('-')[0]),client_text:ticket.client_text||'',entry_shift_code:'REFUERZO'});
+ await sendParkingPrint('ticket',html,true);
+ reShowMessage('Entrada registrada para '+ticket.plate+' · plaza '+ticket.spot+'. Ticket enviado a la impresora de oficina.',false);
 }
 async function rotationEntry() {
   const button = reEl('enterButton');
@@ -93,9 +83,10 @@ async function rotationEntry() {
     });
     reShowMessage('Entrada registrada para ' + result.plate + ' · plaza ' + result.spot + '. Preparando ticket…', false);
     reEl('plate').value = '';
-    await reloadReinforcementSpots();
+    result.client_text=reEl('client').value.trim();
     reEl('client').value = '';
-    printReinforcementTicket(result);
+    try{await printReinforcementTicket(result)}catch(e){reShowMessage('Entrada registrada para '+result.plate+'. No se imprimió: '+e.message+'. Usa Reimprimir ticket; no repitas la entrada.',true)}
+    try{await reloadReinforcementSpots()}catch(e){reShowMessage('Entrada registrada. No se pudo actualizar la lista de plazas: '+e.message,true)}
   } catch (error) {
     reShowMessage(error.message || 'No se pudo registrar la entrada.', true);
   } finally {
@@ -131,6 +122,7 @@ async function createStay() {
     button.disabled = false;
   }
 }
-function reprintTicket() {
-  if (lastReinforcementTicket) window.print();
-}
+async function reprintTicket(){if(!lastReinforcementTicket)return;try{await printReinforcementTicket(lastReinforcementTicket)}catch(e){reShowMessage('No se pudo reimprimir: '+e.message,true)}}
+const esc=reEscape;
+function normalizeRotationPlate(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
+
