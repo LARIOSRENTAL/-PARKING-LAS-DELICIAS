@@ -49,6 +49,7 @@ async function enter() {
     reEl('start').value = now.toISOString().slice(0,16);
     reEl('login').classList.add('hidden');
     reEl('work').classList.remove('hidden');
+    tab('rotation');
     reShowMessage('Acceso temporal activo. Las operaciones quedan registradas sin cobro.', false);
   } catch (error) {
     reEl('loginError').textContent = error.message || 'Código no válido o caducado.';
@@ -59,6 +60,7 @@ async function enter() {
 function tab(name) {
   reEl('rotation').classList.toggle('hidden', name !== 'rotation');
   reEl('stay').classList.toggle('hidden', name !== 'stay');
+  const plate=reEl(name==='stay'?'stayPlate':'plate');plate.focus();plate.select();
 }
 async function printReinforcementTicket(ticket) {
  lastReinforcementTicket=ticket;
@@ -79,13 +81,14 @@ async function rotationEntry() {
       p_tariff: reEl('tariff').value,
       p_plate: plate,
       p_spot: spot,
-      p_client: reEl('client').value.trim()
+      p_client: reEl('client').value.trim().toUpperCase()
     });
     reShowMessage('Entrada registrada para ' + result.plate + ' · plaza ' + result.spot + '. Preparando ticket…', false);
     reEl('plate').value = '';
     result.client_text=reEl('client').value.trim();
     reEl('client').value = '';
-    try{await printReinforcementTicket(result)}catch(e){reShowMessage('Entrada registrada para '+result.plate+'. No se imprimió: '+e.message+'. Usa Reimprimir ticket; no repitas la entrada.',true)}
+    try{await printReinforcementTicket(result)}catch(e){reShowMessage('Entrada registrada para '+result.plate+'. No se imprimió: '+e.message+'. No repitas la entrada.',true)}
+    reEl('plate').focus();
     try{await reloadReinforcementSpots()}catch(e){reShowMessage('Entrada registrada. No se pudo actualizar la lista de plazas: '+e.message,true)}
   } catch (error) {
     reShowMessage(error.message || 'No se pudo registrar la entrada.', true);
@@ -110,12 +113,13 @@ async function createStay() {
       p_model: reEl('model').value.trim().toUpperCase(),
       p_entry: entry.toISOString(),
       p_days: Number(reEl('days').value),
-      p_name: reEl('name').value.trim() || null
+      p_name: reEl('name').value.trim().toUpperCase() || null
     });
     reShowMessage('Estancia creada sin cobro. Reserva ' + result.reference + ' · ' + result.plate + ' · pendiente de cobro.', false);
     reEl('stayPlate').value = '';
     reEl('model').value = '';
     reEl('name').value = '';
+    reEl('stayPlate').focus();
   } catch (error) {
     reShowMessage(error.message || 'No se pudo crear la estancia.', true);
   } finally {
@@ -126,3 +130,6 @@ async function reprintTicket(){if(!lastReinforcementTicket)return;try{await prin
 const esc=reEscape;
 function normalizeRotationPlate(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
 
+
+function normalizeReinforcementText(event){const el=event.target;if(!el.matches('input:not([type="password"]):not([type="datetime-local"]):not([type="number"]),textarea'))return;const start=el.selectionStart,end=el.selectionEnd,value=el.value.toLocaleUpperCase('es-ES');if(el.value!==value){el.value=value;try{el.setSelectionRange(start,end)}catch(e){}}}
+document.addEventListener('input',normalizeReinforcementText,true);document.addEventListener('change',normalizeReinforcementText,true);

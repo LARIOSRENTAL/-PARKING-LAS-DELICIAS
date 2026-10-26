@@ -97,3 +97,7 @@ async function reprintRotationEntryById(id){const row=rotationReportRows.find(x=
 
 /* The checkout itself is the confirmation: Enter submits once, including from amount fields. */
 (function installRotationCheckoutKeyboard(){document.addEventListener('keydown',event=>{const modal=opsEl('rotationCheckoutModal');if(event.key!=='Enter'||event.isComposing||event.ctrlKey||event.altKey||event.metaKey||!modal||modal.classList.contains('hidden')||!modal.contains(event.target))return;if(event.target?.tagName==='TEXTAREA')return;if(event.target?.tagName==='BUTTON'&&event.target!==opsEl('rotCheckoutConfirm'))return;event.preventDefault();event.stopImmediatePropagation();if(!event.repeat&&!opsEl('rotCheckoutConfirm').disabled)confirmRotationCheckout()},true)})();
+
+// The customer's voucher always shows the arrival agreed when creating the stay.
+const buildVoucherBeforePlannedArrival=buildVoucherHtml;
+buildVoucherHtml=function(reservation,spotCode,actualEntry,audit){return buildVoucherBeforePlannedArrival(reservation,spotCode,reservation.entry_at||actualEntry,audit)};
