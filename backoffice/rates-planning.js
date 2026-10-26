@@ -41,6 +41,7 @@ async function saveParkingRate(){
 async function deleteRatePeriod(id){if(!canManageRates()||!confirm('¿Eliminar esta tarifa por fechas? Se volverá a usar la tarifa base.'))return;const r=await db.from('parking_rate_periods').delete().eq('id',id);if(r.error)return alert(r.error.message);await loadRateConfiguration()}
 let manualPriceRequest=0;
 async function updateManualPrice(){
+ const exitField=document.getElementById('mExit'),entry=new Date(document.getElementById('mEntry')?.value),days=Number(document.getElementById('mDays')?.value);if(exitField)exitField.value=Number.isFinite(entry.getTime())&&Number.isInteger(days)&&days>0?localInput(new Date(entry.getTime()+days*86400000)):'';
  const field=document.getElementById('mPrice');if(!field||!mType?.value||!mDays?.value||!mEntry?.value)return;
  const serial=++manualPriceRequest;
  const r=await db.rpc('parking_stay_price',{p_vehicle_type_id:mType.value,p_days:Number(mDays.value),p_entry_at:new Date(mEntry.value).toISOString()});
