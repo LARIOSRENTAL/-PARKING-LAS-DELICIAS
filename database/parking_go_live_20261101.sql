@@ -38,12 +38,12 @@ create or replace function private.parking_entity_movement(p_type text,p_id uuid
 $$;
 revoke all on function private.parking_entity_movement(text,uuid,date) from public,anon,authenticated;
 create or replace function private.parking_is_production(p_type text,p_id uuid,p_month date default null) returns boolean language plpgsql stable security definer set search_path='' as $$
-declare m public.parking_cash_movements;begin m:=private.parking_entity_movement(p_type,p_id,p_month);return coalesce(m.paid_at,clock_timestamp())>=timestamptz '2026-11-01 00:00 Europe/Madrid';end;$$;
+declare m public.parking_cash_movements;begin m:=private.parking_entity_movement(p_type,p_id,p_month);return coalesce(m.paid_at,clock_timestamp())>=timestamptz '2026-10-31 22:00 Europe/Madrid';end;$$;
 revoke all on function private.parking_is_production(text,uuid,date) from public,anon,authenticated;
 create or replace function private.parking_number_full_invoice() returns trigger language plpgsql security definer set search_path='' as $$
 declare m public.parking_cash_movements;begin
  m:=private.parking_entity_movement(new.entity_type,new.entity_id,new.billing_month);
- new.is_production:=coalesce(m.paid_at,new.issued_at,clock_timestamp())>=timestamptz '2026-11-01 00:00 Europe/Madrid';
+ new.is_production:=coalesce(m.paid_at,new.issued_at,clock_timestamp())>=timestamptz '2026-10-31 22:00 Europe/Madrid';
  if new.is_production then
   new.issued_at:=greatest(coalesce(new.issued_at,clock_timestamp()),coalesce(m.paid_at,'-infinity'));
   new.series:=case when new.entity_type='subscriber' then 'OFM' when new.entity_type in('reservation','stay_change','hotel_batch') then 'OFD' else 'OFH' end;
@@ -81,7 +81,7 @@ grant execute on function public.parking_set_monthly_receipt_only(uuid,boolean) 
 create or replace function private.parking_automatic_fiscal_document() returns trigger language plpgsql security definer set search_path='' as $$
 declare mp public.monthly_subscription_payments;s public.monthly_subscribers;
 begin
- if new.paid_at<timestamptz '2026-11-01 00:00 Europe/Madrid' or new.amount_eur<0 or (new.amount_eur=0 and new.entity_type<>'subscriber_payment') then return new;end if;
+ if new.paid_at<timestamptz '2026-10-31 22:00 Europe/Madrid' or new.amount_eur<0 or (new.amount_eur=0 and new.entity_type<>'subscriber_payment') then return new;end if;
  if new.entity_type='subscriber_payment' then
   select * into mp from public.monthly_subscription_payments where id=new.entity_id;select * into s from public.monthly_subscribers where id=mp.subscriber_id;
   if exists(select 1 from private.parking_monthly_receipt_only where subscriber_id=s.id) then
@@ -172,7 +172,7 @@ begin
  if p_entity_type in('reservation','stay_change','hotel_batch') and not exists(select 1 from public.staff_profiles where user_id=auth.uid() and active and role in('admin','manager')) and not exists(select 1 from public.parking_cash_movements m where m.entity_type=p_entity_type and m.entity_id=p_entity_id and m.user_id=auth.uid() and m.shift_id=nullif(public.rotation_operator_context()->>'shift_id','')::uuid) then raise exception 'Solo puedes facturar cobros de tu turno';end if;
  if v_name is null or v_tax is null or v_address is null then raise exception 'Completa nombre, NIF/CIF y domicilio';end if;
  v_m:=private.parking_entity_movement(p_entity_type,p_entity_id,p_billing_month);
- if v_m.id is not null and v_m.paid_at>=timestamptz '2026-11-01 00:00 Europe/Madrid' then
+ if v_m.id is not null and v_m.paid_at>=timestamptz '2026-10-31 22:00 Europe/Madrid' then
   perform 1 from public.parking_cash_movements where id=v_m.id for update;
   select * into v_receipt from public.parking_simplified_invoices where movement_id=v_m.id and series in('OTH','OTD') for update;
   if found then
@@ -225,7 +225,7 @@ begin
  select * into m from public.parking_cash_movements where entity_type=p_entity_type and entity_id=p_entity_id order by paid_at desc limit 1 for update;
  if not found then raise exception 'Primero registra el cobro. Los bonos hotel canjeados no generan un segundo cobro';end if;
  select * into r from public.parking_simplified_invoices where movement_id=m.id;if found then if r.series is not null then return private.parking_receipt_json(r.id);end if;return to_jsonb(r);end if;
- if m.paid_at>=timestamptz '2026-11-01 00:00 Europe/Madrid' then return private.parking_create_production_receipt(m.id,true);end if;
+ if m.paid_at>=timestamptz '2026-10-31 22:00 Europe/Madrid' then return private.parking_create_production_receipt(m.id,true);end if;
  if m.amount_eur>3000 then raise exception 'Para este importe debes emitir una factura completa';end if;
  select id into v_full from public.parking_invoices where entity_type=p_entity_type and entity_id=p_entity_id order by issued_at desc limit 1;
  v_year:=extract(year from clock_timestamp() at time zone 'Europe/Madrid');
@@ -335,7 +335,7 @@ CREATE OR REPLACE FUNCTION private.parking_guard_cash_close()
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
-AS $function$ declare v_state jsonb; v_report jsonb; begin if old.closed_at is null and new.closed_at is not null then v_state:=private.parking_cash_state(new.id); if not coalesce((v_state->>'saved')::boolean,false) then raise exception 'Guarda el Resumen de caja antes de cerrar el turno'; end if; if new.closed_at>=timestamptz '2026-11-01 00:00 Europe/Madrid' and (nullif(v_state->>'difference','') is null or round((v_state->>'difference')::numeric,2)<>0) then raise exception 'No se puede cerrar: la caja está descuadrada en % €. Corrige y guarda el arqueo',v_state->>'difference';end if; v_report:=public.parking_cashbook(new.shift_date,new.shift_code,new.id)||jsonb_build_object('generated_at',new.closed_at,'closed_at',new.closed_at); update public.parking_cash_counts set final_report=v_report where shift_id=new.id; end if; return new; end $function$
+AS $function$ declare v_state jsonb; v_report jsonb; begin if old.closed_at is null and new.closed_at is not null then v_state:=private.parking_cash_state(new.id); if not coalesce((v_state->>'saved')::boolean,false) then raise exception 'Guarda el Resumen de caja antes de cerrar el turno'; end if; if new.shift_date>=date '2026-11-01' and (nullif(v_state->>'difference','') is null or round((v_state->>'difference')::numeric,2)<>0) then raise exception 'No se puede cerrar: la caja está descuadrada en % €. Corrige y guarda el arqueo',v_state->>'difference';end if; v_report:=public.parking_cashbook(new.shift_date,new.shift_code,new.id)||jsonb_build_object('generated_at',new.closed_at,'closed_at',new.closed_at); update public.parking_cash_counts set final_report=v_report where shift_id=new.id; end if; return new; end $function$
 
 ;
 CREATE OR REPLACE FUNCTION private.subscriber_month_quote(p_id uuid, p_month date, p_at timestamp with time zone DEFAULT clock_timestamp())
@@ -358,7 +358,7 @@ begin
  discount:=case when late then 0 else least(price,greatest(0,coalesce(s.discount_amount_eur,round(price*coalesce(s.discount_pct,0)/100,2)))) end;
  if exists(select 1 from private.parking_monthly_receipt_only where subscriber_id=s.id) then price:=s.total_eur;discount:=0;rate:=0;end if;
  vat:=round(greatest(0,price-discount)*rate/100,2);total:=greatest(0,price-discount)+vat;
- review:=not paid and exists(select 1 from public.parking_invoices i where i.entity_type='subscriber' and i.entity_id=p_id and i.billing_month=p_month and i.is_production=(p_at>=timestamptz '2026-11-01 00:00 Europe/Madrid') and i.total_eur<>total);
+ review:=not paid and exists(select 1 from public.parking_invoices i where i.entity_type='subscriber' and i.entity_id=p_id and i.billing_month=p_month and i.is_production=(p_at>=timestamptz '2026-10-31 22:00 Europe/Madrid') and i.total_eur<>total);
  return jsonb_build_object('price',price,'discount',discount,'vat_pct',rate,'vat_eur',vat,'total_eur',total,'discount_forfeited',late and coalesce(s.discount_amount_eur,round(price*coalesce(s.discount_pct,0)/100,2))>0,'discount_deadline',cutoff,'alert_from',alert_at,'paid',paid,'overdue_alert',s.active and not paid and p_at>=alert_at,'invoice_requires_review',review);
 end$function$
 
@@ -399,13 +399,13 @@ begin
  recipient_email:=lower(nullif(btrim(s.email),''));
  if nullif(btrim(s.customer_name),'')is null or nullif(btrim(s.tax_id),'')is null or nullif(btrim(s.address),'')is null then update public.parking_invoice_mail_jobs set status='missing_fiscal',recipient=recipient_email,last_error='Faltan nombre, NIF/CIF o domicilio de facturación',updated_at=clock_timestamp()where id=j.id;return;end if;
  perform pg_advisory_xact_lock(hashtextextended('monthly-invoice:'||s.id||':'||p.billing_month,0));
- select * into v from public.parking_invoices where entity_type='subscriber'and entity_id=s.id and billing_month=p.billing_month and is_production=(p.paid_at>=timestamptz '2026-11-01 00:00 Europe/Madrid');
+ select * into v from public.parking_invoices where entity_type='subscriber'and entity_id=s.id and billing_month=p.billing_month and is_production=(p.paid_at>=timestamptz '2026-10-31 22:00 Europe/Madrid');
  if not found then
   price:=coalesce((j.pricing_snapshot->>'price')::numeric,s.price_eur);discount:=coalesce((j.pricing_snapshot->>'discount')::numeric,s.discount_amount_eur,round(s.price_eur*coalesce(s.discount_pct,0)/100,2));vat:=round((price-discount)*coalesce((j.pricing_snapshot->>'vat_pct')::numeric,s.vat_pct,21)/100,2);
   insert into public.parking_invoices(entity_type,entity_id,billing_month,customer_name,customer_tax_id,customer_address,vehicle,plate,amount_before_vat,discount_eur,vat_eur,total_eur,issued_by)
   values('subscriber',s.id,p.billing_month,s.customer_name,s.tax_id,concat_ws(' ',s.address,s.postal_code,s.city),s.vehicle,s.plate,price,discount,vat,price-discount+vat,p.paid_by)
   on conflict do nothing;
-  select * into v from public.parking_invoices where entity_type='subscriber'and entity_id=s.id and billing_month=p.billing_month and is_production=(p.paid_at>=timestamptz '2026-11-01 00:00 Europe/Madrid');
+  select * into v from public.parking_invoices where entity_type='subscriber'and entity_id=s.id and billing_month=p.billing_month and is_production=(p.paid_at>=timestamptz '2026-10-31 22:00 Europe/Madrid');
  end if;
  update public.parking_invoice_mail_jobs set invoice_id=v.id,recipient=recipient_email,status=case when recipient_email is null or recipient_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'then 'missing_email'else 'queued'end,last_error=case when recipient_email is null then 'Falta email del cliente'else null end,updated_at=clock_timestamp()where id=j.id;
 end $function$
@@ -510,9 +510,7 @@ begin
  end if;
  if c.amount_eur>0 and c.payment_method='card' and receipt is null then receipt:=public.parking_issue_simplified('stay_change',c.id);end if;
  return jsonb_build_object('reservation',to_jsonb(updated),'change',to_jsonb(c),'receipt',receipt,'invoice',invoice);
-end $function$
-
-;
+end $function$;
 -- Preserve existing report APIs and add independent series/number/date fields.
 create or replace function private.parking_report_fiscal_fields(p_type text,p_id uuid,p_at timestamptz) returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare m public.parking_cash_movements;f public.parking_invoices;r public.parking_simplified_invoices;mp public.monthly_subscription_payments;mr public.parking_monthly_receipts;
@@ -522,7 +520,7 @@ begin
   select * into mr from public.parking_monthly_receipts where payment_id=p_id;
   if found then return jsonb_build_object('document_series',null,'document_number',null,'document_date',(mr.issued_at at time zone 'Europe/Madrid')::date,'document_kind','monthly_receipt','receipt_month',mr.billing_month,'invoice_number','','receipt_number','','customer_name',mr.customer_name,'customer_tax_id',mr.customer_tax_id,'customer_address',mr.customer_address,'base_eur',mr.amount_eur,'vat_eur',0);end if;
  end if;
- select * into f from public.parking_invoices i where ((i.entity_type=p_type and i.entity_id=p_id) or (p_type='subscriber_payment' and i.entity_type='subscriber' and i.entity_id=mp.subscriber_id and i.billing_month=mp.billing_month)) and i.is_production=(p_at>=timestamptz '2026-11-01 00:00 Europe/Madrid') order by i.issued_at desc limit 1;
+ select * into f from public.parking_invoices i where ((i.entity_type=p_type and i.entity_id=p_id) or (p_type='subscriber_payment' and i.entity_type='subscriber' and i.entity_id=mp.subscriber_id and i.billing_month=mp.billing_month)) and i.is_production=(p_at>=timestamptz '2026-10-31 22:00 Europe/Madrid') order by i.issued_at desc limit 1;
  if found then return jsonb_build_object('document_series',f.series,'document_number',coalesce(f.serial_number,f.number::text),'document_date',coalesce(f.invoice_date,(f.issued_at at time zone 'Europe/Madrid')::date),'document_kind','full','invoice_number',coalesce(f.display_number,f.number::text),'customer_name',f.customer_name,'customer_tax_id',f.customer_tax_id,'customer_address',f.customer_address,'base_eur',f.amount_before_vat-coalesce(f.discount_eur,0),'vat_eur',f.vat_eur);end if;
  select * into r from public.parking_simplified_invoices where movement_id=m.id;
  if found then return jsonb_build_object('document_series',r.series,'document_number',coalesce(r.serial_number,r.number),'document_date',coalesce(r.invoice_date,(r.issued_at at time zone 'Europe/Madrid')::date),'document_kind','simplified','receipt_number',r.number,'customer_name',coalesce(r.customer_name,'CLIENTES VARIOS'),'customer_tax_id',coalesce(r.customer_tax_id,''),'customer_address',coalesce(r.customer_address,''),'base_eur',r.amount_before_vat,'vat_eur',r.vat_eur);end if;
@@ -567,6 +565,181 @@ begin
  left join public.parking_simplified_invoices receipt on m.kind='income' and receipt.movement_id=m.id
  left join lateral(select i.customer_name,i.customer_tax_id,i.customer_address from public.parking_invoices i where (i.entity_type=m.entity_type and i.entity_id=m.entity_id) or (m.entity_type='subscriber_payment' and i.entity_type='subscriber' and i.entity_id=mp.subscriber_id and i.billing_month=mp.billing_month) order by i.issued_at desc,i.number desc limit 1) inv on true;
  return jsonb_build_object('from',v_from,'to_exclusive',v_to,'from_local',p_from,'to_local',p_to,'rows',v_rows,'generated_at',clock_timestamp());
+end $function$;
+-- The operational day starts at 22:00 Europe/Madrid on the preceding date.
+create or replace function private.parking_shift_slot(p_at timestamptz) returns jsonb language sql immutable set search_path='' as $$
+ select jsonb_build_object('shift_code',case when extract(hour from t)>=22 or extract(hour from t)<6 then 1 when extract(hour from t)<14 then 2 else 3 end,'shift_date',t::date+case when extract(hour from t)>=22 then 1 else 0 end) from (select p_at at time zone 'Europe/Madrid' t) q;
+$$;
+revoke all on function private.parking_shift_slot(timestamptz) from public,anon,authenticated;
+create table if not exists private.parking_initial_cash_openings(shift_id uuid primary key references public.staff_shifts(id),amount_eur numeric(12,2) not null check(amount_eur>=0),created_at timestamptz not null default clock_timestamp(),created_by uuid not null);
+alter table private.parking_initial_cash_openings enable row level security;
+revoke all on private.parking_initial_cash_openings from public,anon,authenticated;
+create or replace function private.parking_initialise_cash_opening(p_shift_id uuid,p_amount numeric) returns void language plpgsql security definer set search_path='' as $$
+declare s public.staff_shifts;
+begin
+ select * into s from public.staff_shifts where id=p_shift_id and user_id=auth.uid() and closed_at is null for update;
+ if not found or not private.is_staff() then raise exception 'Necesitas tu turno abierto';end if;
+ if s.shift_date<>date '2026-11-01' or s.shift_code<>1 then raise exception 'El saldo inicial manual corresponde al turno 1 del 1/11/2026';end if;
+ if p_amount is null or p_amount<0 or p_amount>=10000000000 or p_amount<>round(p_amount,2) then raise exception 'Introduce un saldo inicial válido en euros, con un máximo de dos decimales';end if;
+ if exists(select 1 from private.parking_initial_cash_openings where shift_id=s.id) then raise exception 'El saldo inicial de este turno ya está registrado';end if;
+ insert into private.parking_initial_cash_openings(shift_id,amount_eur,created_by)values(s.id,p_amount,auth.uid());
+ insert into public.parking_cash_counts(shift_id,opening_balance,loose_coins,wrapped_coins,banknotes,vouchers,denomination_breakdown,updated_by)
+ values(s.id,p_amount,0,0,p_amount,0,jsonb_build_object('banknotes',jsonb_build_object('unallocated',p_amount)),auth.uid());
+ insert into public.staff_activity_log(shift_id,user_id,action,entity_type,entity_id,details) values(s.id,auth.uid(),'cash_opening_confirmed','cash_count',s.id,jsonb_build_object('opening_balance',p_amount,'reason','Inicio de uso de la aplicación'));
+end;$$;
+revoke all on function private.parking_initialise_cash_opening(uuid,numeric) from public,anon,authenticated;
+create or replace function private.parking_guard_initial_opening_balance() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if exists(select 1 from private.parking_initial_cash_openings o where o.shift_id=new.shift_id and o.amount_eur is distinct from new.opening_balance) then raise exception 'El saldo de entrada ya se confirmó al abrir el turno y no se puede modificar';end if;return new;
+end;$$;
+revoke all on function private.parking_guard_initial_opening_balance() from public,anon,authenticated;
+drop trigger if exists guard_initial_cash_opening on public.parking_cash_counts;
+create trigger guard_initial_cash_opening before insert or update of opening_balance on public.parking_cash_counts for each row execute function private.parking_guard_initial_opening_balance();
+create or replace function public.parking_shift_opening_requirement() returns jsonb language plpgsql security definer set search_path='' as $$
+declare slot jsonb;
+begin
+ if auth.uid() is null or not private.is_staff() then raise exception 'No autorizado';end if;
+ if exists(select 1 from public.staff_shifts where user_id=auth.uid() and closed_at is null) then return jsonb_build_object('required',false);end if;
+ slot:=private.parking_shift_slot(clock_timestamp());return slot||jsonb_build_object('required',(slot->>'shift_date')='2026-11-01' and (slot->>'shift_code')::integer=1);
+end;$$;
+revoke all on function public.parking_shift_opening_requirement() from public,anon;
+grant execute on function public.parking_shift_opening_requirement() to authenticated;
+CREATE OR REPLACE FUNCTION private.parking_open_staff_shift(p_opening_balance numeric)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'private', 'auth', 'pg_temp'
+AS $function$
+declare
+  v_user uuid := auth.uid();
+  v_shift public.staff_shifts%rowtype;
+  v_local timestamp := clock_timestamp() at time zone 'Europe/Madrid';
+  v_hour integer;
+  v_code smallint;
+  v_date date;
+  v_name text;
+  v_role text;
+begin
+  if v_user is null or not private.is_staff() then
+    raise exception 'Acceso no autorizado';
+  end if;
+
+  select full_name, role into v_name, v_role
+  from public.staff_profiles
+  where user_id=v_user and active=true;
+
+  if v_name is null then
+    raise exception 'Usuario no autorizado';
+  end if;
+
+  if v_role='admin' then
+    raise exception 'El administrador utiliza acceso libre y no participa en turnos';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('parking-open-shift:'||v_user::text,0));
+  select * into v_shift
+  from public.staff_shifts
+  where user_id=v_user and closed_at is null
+  order by opened_at desc
+  limit 1;
+
+  if found then
+    return jsonb_build_object(
+      'ok',true,'already_open',true,'id',v_shift.id,
+      'shift_number',v_shift.shift_code,
+      'shift_code',v_shift.shift_code,
+      'shift_date',v_shift.shift_date,
+      'opened_at',v_shift.opened_at,
+      'employee_name',v_name
+    );
+  end if;
+
+  v_hour := extract(hour from v_local);
+  if v_hour >= 22 then
+    v_code := 1;
+    v_date := v_local::date + 1;
+  elsif v_hour < 6 then
+    v_code := 1;
+    v_date := v_local::date;
+  elsif v_hour < 14 then
+    v_code := 2;
+    v_date := v_local::date;
+  else
+    v_code := 3;
+    v_date := v_local::date;
+  end if;
+
+  if v_date=date '2026-11-01' and v_code=1 and (p_opening_balance is null or p_opening_balance<0 or p_opening_balance>=10000000000 or p_opening_balance<>round(p_opening_balance,2)) then
+    raise exception 'Introduce el saldo de caja a la entrada para iniciar el turno 1 del 1/11';
+  end if;
+
+  insert into public.staff_shifts(user_id,shift_code,shift_date)
+  values(v_user,v_code,v_date)
+  returning * into v_shift;
+
+  if v_date=date '2026-11-01' and v_code=1 then
+    perform private.parking_initialise_cash_opening(v_shift.id,p_opening_balance);
+  end if;
+
+  insert into public.staff_activity_log(shift_id,user_id,action,entity_type,entity_id,details)
+  values(v_shift.id,v_user,'shift_opened','shift',v_shift.id,
+    jsonb_build_object(
+      'shift_number',v_code,
+      'shift_code',v_code,
+      'shift_date',v_date,
+      'employee_name',v_name
+    ));
+
+  return jsonb_build_object(
+    'ok',true,'already_open',false,'id',v_shift.id,
+    'shift_number',v_code,
+    'shift_code',v_code,
+    'shift_date',v_date,
+    'opened_at',v_shift.opened_at,
+    'employee_name',v_name
+  );
+end
+$function$
+
+;
+revoke all on function private.parking_open_staff_shift(numeric) from public,anon,authenticated;
+create or replace function public.open_staff_shift() returns jsonb language sql security definer set search_path='' as $$select private.parking_open_staff_shift(null)$$;
+create or replace function public.parking_start_staff_shift(p_opening_balance numeric default null) returns jsonb language sql security definer set search_path='' as $$select private.parking_open_staff_shift(p_opening_balance)$$;
+revoke all on function public.open_staff_shift() from public,anon;
+revoke all on function public.parking_start_staff_shift(numeric) from public,anon;
+grant execute on function public.open_staff_shift() to authenticated;
+grant execute on function public.parking_start_staff_shift(numeric) to authenticated;
+CREATE OR REPLACE FUNCTION private.parking_cash_state(p_shift_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare v jsonb;v_active jsonb;v_total numeric;v_legacy numeric;v_until timestamptz;v_returns jsonb;v_detail jsonb;v_production boolean;
+begin
+ v:=private.parking_cash_state_before_vouchers(p_shift_id);
+ select denomination_breakdown into v_detail from public.parking_cash_counts where shift_id=p_shift_id;
+ if v_detail is null and nullif(v->>'inherited_from_shift','') is not null then
+  select denomination_breakdown into v_detail from public.parking_cash_counts where shift_id=(v->>'inherited_from_shift')::uuid;
+ end if;
+ select coalesce(closed_at,clock_timestamp()) into v_until from public.staff_shifts where id=p_shift_id;
+ select shift_date>=date '2026-11-01' into v_production from public.staff_shifts where id=p_shift_id;
+ v_legacy:=case when v_production then 0 else private.parking_legacy_voucher_balance(v_until) end;
+ select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb),coalesce(sum(e.amount_eur),0)+v_legacy into v_active,v_total
+ from public.parking_cash_entries e where e.kind='voucher' and (not v_production or e.created_at>=timestamptz '2026-10-31 22:00 Europe/Madrid') and e.created_at<=v_until and not exists(select 1 from public.parking_cash_voucher_returns r where r.voucher_id=e.id and r.returned_at<=v_until);
+ select coalesce(jsonb_agg(to_jsonb(r)||jsonb_build_object('entry_number',e.entry_number) order by r.returned_at),'[]'::jsonb) into v_returns from public.parking_cash_voucher_returns r join public.parking_cash_entries e on e.id=r.voucher_id where r.shift_id=p_shift_id;
+ select v_returns||coalesce(jsonb_agg(to_jsonb(r)||jsonb_build_object('legacy',true)),'[]'::jsonb) into v_returns from private.parking_legacy_voucher_returns r where r.shift_id=p_shift_id;
+ return v||jsonb_build_object('denomination_breakdown',coalesce(v_detail,'{}'::jsonb),'vouchers',v_total,'legacy_vouchers',v_legacy,'active_vouchers',v_active,'voucher_returns',v_returns,'counted_total',(v->>'cash_total')::numeric+v_total,'difference',(v->>'cash_total')::numeric+v_total-(v->>'expected_balance')::numeric);
 end $function$
 
 ;
+CREATE OR REPLACE FUNCTION public.parking_active_cash_vouchers()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+ if auth.uid() is null or not private.is_staff() then raise exception 'No autorizado';end if;
+ return jsonb_build_object('rows',(select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb)from public.parking_cash_entries e where e.kind='voucher' and (clock_timestamp()<timestamptz '2026-10-31 22:00 Europe/Madrid' or e.created_at>=timestamptz '2026-10-31 22:00 Europe/Madrid') and not exists(select 1 from public.parking_cash_voucher_returns r where r.voucher_id=e.id)),'legacy_vouchers',case when clock_timestamp()>=timestamptz '2026-10-31 22:00 Europe/Madrid' then 0 else private.parking_legacy_voucher_balance() end);
+end$function$;

@@ -23,6 +23,14 @@ DO $$declare t text;k text;mid uuid;eid uuid;r jsonb;f jsonb;ser text;num text;b
   end loop;
  end loop;
  if private.parking_fiscal_serial('OFD',timestamptz '2027-01-01 10:00 Europe/Madrid')<>'270001' then raise exception 'Annual numbering did not restart';end if;
+ -- Automatic documents begin at 22:00 on October 31, not midnight.
+ eid:=gen_random_uuid();insert into public.parking_cash_movements(source_key,category,entity_type,entity_id,amount_eur,payment_method,paid_at,user_id)values(gen_random_uuid()::text,'rotation','rotation',eid,10,'cash',timestamptz '2026-10-31 21:59:59 Europe/Madrid',auth.uid())returning id into mid;
+ set constraints automatic_production_fiscal_document immediate;
+ if exists(select 1 from public.parking_simplified_invoices where movement_id=mid)then raise exception 'Test document consumed production counter';end if;
+ set constraints automatic_production_fiscal_document deferred;
+ eid:=gen_random_uuid();insert into public.parking_cash_movements(source_key,category,entity_type,entity_id,amount_eur,payment_method,paid_at,user_id)values(gen_random_uuid()::text,'rotation','rotation',eid,10,'cash',timestamptz '2026-10-31 22:00 Europe/Madrid',auth.uid())returning id into mid;
+ set constraints automatic_production_fiscal_document immediate;
+ if not exists(select 1 from public.parking_simplified_invoices where movement_id=mid and series='ONH' and invoice_date=date '2026-10-31')then raise exception 'Production did not begin with first overnight shift';end if;
 end$$;
 DO $$declare sub uuid;pay uuid;mid uuid;receipt_sub uuid;report jsonb;shift uuid;begin
  insert into public.monthly_subscribers(customer_name,price_eur,discount_pct,discount_amount_eur,vat_pct,total_eur,active,tax_id,address) values('QA MONTHLY',100,0,0,21,121,true,'QA-M','QA STREET') returning id into sub;
@@ -43,9 +51,17 @@ DO $$declare sub uuid;pay uuid;mid uuid;receipt_sub uuid;report jsonb;shift uuid
  report:=public.parking_billing_movements(timestamp '2026-11-01 00:00',timestamp '2026-11-01 23:59');
  if exists(select 1 from jsonb_array_elements(report->'rows') r where r->>'kind'='income' and r->>'document_kind' is null) then raise exception 'Fiscal export is missing a document';end if;
  if not exists(select 1 from jsonb_array_elements(report->'rows') r where r->>'document_series'='OFD' and r->>'document_number'='260001' and r->>'document_date'='2026-11-01') then raise exception 'Export series/number/date separation failed';end if;
- insert into public.staff_shifts(user_id,shift_date,shift_code,opened_at) values(auth.uid(),date '2026-11-01',1,timestamptz '2026-11-01 08:00 Europe/Madrid') returning id into shift;
- perform set_config('sandbox.difference','5',true);
+ insert into public.staff_shifts(user_id,shift_date,shift_code,opened_at) values(auth.uid(),date '2026-11-01',1,timestamptz '2026-10-31 22:00 Europe/Madrid') returning id into shift;
+ if private.parking_shift_slot(timestamptz '2026-10-31 21:59:59 Europe/Madrid')->>'shift_date'<>'2026-10-31' or private.parking_shift_slot(timestamptz '2026-10-31 22:00 Europe/Madrid')->>'shift_date'<>'2026-11-01' or private.parking_shift_slot(timestamptz '2026-10-31 22:00 Europe/Madrid')->>'shift_code'<>'1' then raise exception 'Operational day boundary incorrect';end if;
+ insert into public.parking_cash_entries(kind,amount_eur,created_at)values('voucher',30,timestamptz '2026-10-30 12:00 Europe/Madrid');
+ begin perform private.parking_initialise_cash_opening(shift,null);raise exception using errcode='ZX003',message='Missing opening accepted';exception when sqlstate 'P0001' then null;end;
+ perform private.parking_initialise_cash_opening(shift,123.45);
+ report:=private.parking_cash_state(shift);
+ if (report->>'opening_balance')::numeric<>123.45 or (report->>'difference')::numeric<>0 or (report->>'vouchers')::numeric<>0 then raise exception 'Opening is not balanced or inherited test vouchers: %',report;end if;
+ begin perform private.parking_initialise_cash_opening(shift,500);raise exception using errcode='ZX004',message='Opening overwritten';exception when sqlstate 'P0001' then null;end;
+ begin update public.parking_cash_counts set opening_balance=500 where shift_id=shift;raise exception using errcode='ZX005',message='Immutable opening altered';exception when sqlstate 'P0001' then null;end;
+ update public.parking_cash_counts set banknotes=128.45 where shift_id=shift;
  begin update public.staff_shifts set closed_at=timestamptz '2026-11-01 14:00 Europe/Madrid' where id=shift;raise exception using errcode='ZX002',message='Unbalanced production shift closed';exception when sqlstate 'P0001' then if sqlerrm not ilike '%descuadrada%' then raise;end if;end;
- perform set_config('sandbox.difference','0',true);update public.staff_shifts set closed_at=timestamptz '2026-11-01 14:00 Europe/Madrid' where id=shift;
+ update public.parking_cash_counts set banknotes=123.45 where shift_id=shift;update public.staff_shifts set closed_at=timestamptz '2026-11-01 14:00 Europe/Madrid' where id=shift;
  if not exists(select 1 from public.staff_shifts where id=shift and closed_at is not null) then raise exception 'Balanced shift failed to close';end if;
 end$$;
