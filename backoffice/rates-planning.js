@@ -97,3 +97,6 @@ async function editInventoryState(id){
  const r=await db.from('parking_spots').update({inventory_state:state}).eq('id',id);if(r.error)return alert(r.error.message);spot.inventory_state=state;await loadSpots();await loadReservations();
 }
 
+
+// Keep the date field's native calendar as the only calendar control.
+document.querySelector('#manual .manualExitPicker > button[onclick="openManualExitCalendar()"]')?.remove();
