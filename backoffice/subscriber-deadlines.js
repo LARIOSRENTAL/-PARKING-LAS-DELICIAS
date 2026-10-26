@@ -1,5 +1,5 @@
 /* Monthly payment deadlines use server-side Madrid dates and frozen collection prices. */
-function subscriberMonthAlerts(rows){return rows.filter(s=>s.active&&s.monthly_charge?.overdue_alert)}
+function subscriberMonthAlerts(rows){return rows.filter(s=>s.active&&!subscriberHasZeroCharge(s)&&s.monthly_charge?.overdue_alert)}
 function subscriberMonthAlertHtml(rows){const late=subscriberMonthAlerts(rows);return late.length?'<div class="msg error" role="alert"><b>'+late.length+' abonado(s) sin pagar antes del día 15.</b> Revisa los marcados como IMPAGO. Las cuotas pendientes desde el día 10 se cobran sin descuento.</div>':''}
 let subscriberDeadlineRequest=0;
 async function refreshSubscriberDeadlineAlerts(){
