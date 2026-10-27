@@ -7,7 +7,18 @@ const reinforcementDb = window.supabase.createClient(
 let reinforcementCode = '';
 let reinforcementData = null;
 let lastReinforcementTicket = null;
-async function reloadReinforcementSpots(){if(!reinforcementCode)return;const options=await reCall('parking_reinforcement_options',{p_code:reinforcementCode});reinforcementData=options;const tariff=reEl('tariff').value;const previous=reEl('spot').value;const free=(options.spots||[]).filter(s=>(s.tariffs||[]).includes(tariff));reEl('spot').innerHTML='<option value="">Selecciona plaza libre</option>'+free.map(s=>'<option value="'+reEscape(s.code)+'">'+reEscape(s.code)+'</option>').join('');if(free.some(s=>s.code===previous))reEl('spot').value=previous;}
+function reinforcementFreeSpots(){return (reinforcementData?.spots||[]).filter(s=>(s.tariffs||[]).includes(reEl('tariff').value));}
+function reinforcementSpotCode(value){return String(value||'').toUpperCase().replace(/[\s-]/g,'');}
+async function reloadReinforcementSpots(){
+  if(!reinforcementCode)return;
+  const options=await reCall('parking_reinforcement_options',{p_code:reinforcementCode});
+  reinforcementData=options;
+  const previous=reEl('spot').value;
+  const free=reinforcementFreeSpots();
+  reEl('spotOptions').innerHTML=free.map(s=>'<option value="'+reEscape(s.code)+'"></option>').join('');
+  const selected=free.find(s=>reinforcementSpotCode(s.code)===reinforcementSpotCode(previous));
+  reEl('spot').value=selected?selected.code:'';
+}
 const reEl = id => document.getElementById(id);
 function reEscape(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -72,8 +83,11 @@ async function rotationEntry() {
   const button = reEl('enterButton');
   if (button.disabled) return;
   const plate = reEl('plate').value.trim().toUpperCase();
-  const spot = reEl('spot').value.trim().toUpperCase();
-  if (plate.length < 3 || !spot) { reShowMessage('Indica una matrícula y una plaza.', true); return; }
+  const selectedSpot = reinforcementFreeSpots().find(s=>reinforcementSpotCode(s.code)===reinforcementSpotCode(reEl('spot').value));
+  if (plate.length < 3) { reShowMessage('Indica una matrícula válida.', true); reEl('plate').focus(); return; }
+  if (!selectedSpot) { reShowMessage('Selecciona una plaza disponible de las sugerencias.', true); reEl('spot').focus(); return; }
+  const spot = selectedSpot.code;
+  reEl('spot').value = spot;
   button.disabled = true;
   try {
     const result = await reCall('parking_reinforcement_enter', {
