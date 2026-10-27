@@ -7,8 +7,31 @@ const reinforcementDb = window.supabase.createClient(
 let reinforcementCode = '';
 let reinforcementData = null;
 let lastReinforcementTicket = null;
+const reEl = id => document.getElementById(id);
 function reinforcementFreeSpots(){return (reinforcementData?.spots||[]).filter(s=>(s.tariffs||[]).includes(reEl('tariff').value));}
 function reinforcementSpotCode(value){return String(value||'').toUpperCase().replace(/[\s-]/g,'');}
+function selectedReinforcementSpot(){
+  const code=reinforcementSpotCode(reEl('spot').value),free=reinforcementFreeSpots();
+  if(['A','M'].includes(code))return free.filter(s=>String(s.code).toUpperCase().split('-')[0]===code).sort((a,b)=>a.code.localeCompare(b.code,'es',{numeric:true}))[0];
+  return free.find(s=>reinforcementSpotCode(s.code)===code);
+}
+function completeReinforcementZone(selectSuffix=false){
+  const input=reEl('spot'),zone=reinforcementSpotCode(input.value);
+  if(!['A','M'].includes(zone))return;
+  const spot=selectedReinforcementSpot();
+  if(!spot){reEl('spotHelp').textContent='No hay plazas '+zone+' disponibles para esta tarifa.';return;}
+  input.value=spot.code;
+  if(selectSuffix)input.setSelectionRange(1,input.value.length);
+  reEl('spotHelp').textContent='Primera plaza libre: '+spot.code+' · No deja llaves.';
+}
+reEl('spot').addEventListener('input',event=>{
+  reEl('spotHelp').textContent='Escribe una plaza; A o M selecciona automáticamente la primera libre.';
+  if(!String(event.inputType||'').startsWith('delete'))completeReinforcementZone(true);
+});
+reEl('spot').addEventListener('change',()=>completeReinforcementZone());
+reEl('spot').addEventListener('keydown',event=>{
+  if(event.key==='Enter'){event.preventDefault();completeReinforcementZone();rotationEntry();}
+});
 async function reloadReinforcementSpots(){
   if(!reinforcementCode)return;
   const options=await reCall('parking_reinforcement_options',{p_code:reinforcementCode});
@@ -19,7 +42,6 @@ async function reloadReinforcementSpots(){
   const selected=free.find(s=>reinforcementSpotCode(s.code)===reinforcementSpotCode(previous));
   reEl('spot').value=selected?selected.code:'';
 }
-const reEl = id => document.getElementById(id);
 function reEscape(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -83,7 +105,7 @@ async function rotationEntry() {
   const button = reEl('enterButton');
   if (button.disabled) return;
   const plate = reEl('plate').value.trim().toUpperCase();
-  const selectedSpot = reinforcementFreeSpots().find(s=>reinforcementSpotCode(s.code)===reinforcementSpotCode(reEl('spot').value));
+  const selectedSpot = selectedReinforcementSpot();
   if (plate.length < 3) { reShowMessage('Indica una matrícula válida.', true); reEl('plate').focus(); return; }
   if (!selectedSpot) { reShowMessage('Selecciona una plaza disponible de las sugerencias.', true); reEl('spot').focus(); return; }
   const spot = selectedSpot.code;
