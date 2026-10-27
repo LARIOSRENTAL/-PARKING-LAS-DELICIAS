@@ -15,20 +15,26 @@ function selectedReinforcementSpot(){
   if(['A','M'].includes(code))return free.filter(s=>String(s.code).toUpperCase().split('-')[0]===code).sort((a,b)=>a.code.localeCompare(b.code,'es',{numeric:true}))[0];
   return free.find(s=>reinforcementSpotCode(s.code)===code);
 }
-function completeReinforcementZone(selectSuffix=false){
+function completeReinforcementZone(){
   const input=reEl('spot'),zone=reinforcementSpotCode(input.value);
   if(!['A','M'].includes(zone))return;
   const spot=selectedReinforcementSpot();
   if(!spot){reEl('spotHelp').textContent='No hay plazas '+zone+' disponibles para esta tarifa.';return;}
   input.value=spot.code;
-  if(selectSuffix)input.setSelectionRange(1,input.value.length);
+  input.removeAttribute('list');
+  input.setSelectionRange(input.value.length,input.value.length);
   reEl('spotHelp').textContent='Primera plaza libre: '+spot.code+' · No deja llaves.';
 }
+let reinforcementZoneTimer;
 reEl('spot').addEventListener('input',event=>{
+  clearTimeout(reinforcementZoneTimer);
+  reEl('spot').setAttribute('list','spotOptions');
   reEl('spotHelp').textContent='Escribe una plaza; A o M selecciona automáticamente la primera libre.';
-  if(!String(event.inputType||'').startsWith('delete'))completeReinforcementZone(true);
+  if(!event.isComposing&&!String(event.inputType||'').startsWith('delete'))reinforcementZoneTimer=setTimeout(completeReinforcementZone,0);
 });
+reEl('spot').addEventListener('compositionend',()=>{clearTimeout(reinforcementZoneTimer);reinforcementZoneTimer=setTimeout(completeReinforcementZone,0);});
 reEl('spot').addEventListener('change',()=>completeReinforcementZone());
+reEl('spot').addEventListener('blur',()=>completeReinforcementZone());
 reEl('spot').addEventListener('keydown',event=>{
   if(event.key==='Enter'){event.preventDefault();completeReinforcementZone();rotationEntry();}
 });
