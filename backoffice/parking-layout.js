@@ -38,6 +38,7 @@ function parkingMapPosition(zone,code){
   else if(n===43){x=57;y=5;w=27;h=8}
   else{x=85;y=5;w=14;h=14}
  }else return '';
+ if(zone==='C')x=100-x-w;
  return `left:${x}%;top:${y}%;width:${w}%;height:${h}%`;
 }
 function switchParkingPlanZone(zone){parkingPlanZone=zone;document.querySelectorAll('[data-plan-zone]').forEach(e=>{const on=e.dataset.planZone===zone;if(e.tagName==='BUTTON'){e.classList.toggle('active',on);e.setAttribute('aria-selected',String(on))}else e.hidden=!on});sizeParkingMap()}

@@ -12,6 +12,9 @@
 .parkingMap .spot strong{font-size:13px}@media(max-width:800px){.parkingMap .spot strong{font-size:13px}}.clientData{margin:10px 0 14px}.clientData summary{cursor:pointer;font-weight:700;padding:8px 0}.stayEditSummary{padding:10px;background:#eef6f3;border-radius:8px;margin:10px 0;font-weight:700}.stayEditFields .field{margin-bottom:8px}.stayEditFields input,.stayEditFields select{min-width:0}
 
 /* C office occupies the gap below C-22 and above C-19. */
-.planGroup[data-plan-zone="C"] .mapOffice{left:84%;right:auto;top:48%;width:15%;height:9%;padding:2px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.planGroup[data-plan-zone="C"] .mapOffice{left:1%;right:auto;top:48%;width:15%;height:9%;padding:2px;display:flex;align-items:center;justify-content:center;pointer-events:none}
 
 [data-cash-pane="count"] input[data-cash-total]{background:#edf1f5;color:#40546a;font-weight:800;cursor:default}
+
+/* Mirror zone C horizontally while keeping labels readable. */
+.planGroup[data-plan-zone="C"] .mapAisle{left:auto;right:18%}
