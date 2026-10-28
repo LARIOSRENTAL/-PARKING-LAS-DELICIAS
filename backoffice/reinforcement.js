@@ -95,7 +95,7 @@ async function enter() {
   }
 }
 function tab(name) {
-  if(name==='stay')refreshReinforcementStayDates();
+  if(name==='stay'){refreshReinforcementStayDates();reloadReinforcementStaySpots().catch(e=>reShowMessage(e.message,true));}
   reEl('rotation').classList.toggle('hidden', name !== 'rotation');
   reEl('stay').classList.toggle('hidden', name !== 'stay');
   const plate=reEl(name==='stay'?'stayPlate':'plate');plate.focus();plate.select();
@@ -162,8 +162,9 @@ async function createStay() {
   }
   button.disabled = true;
   try {
-    const result = await reCall('parking_reinforcement_create_stay', {
+    const result = await reCall('parking_reinforcement_create_stay_with_spot', {
       p_code: reinforcementCode,
+      p_spot_id: reEl('staySpot').value || null,
       p_type: reEl('type').value,
       p_plate: reEl('stayPlate').value.trim().toUpperCase(),
       p_model: reEl('model').value.trim().toUpperCase(),
@@ -175,6 +176,8 @@ async function createStay() {
     reEl('stayPlate').value = '';
     reEl('model').value = '';
     reEl('name').value = '';
+    reEl('staySpot').value='';
+    await reloadReinforcementStaySpots().catch(()=>{});
     reEl('stayPlate').focus();
   } catch (error) {
     reShowMessage(error.message || 'No se pudo crear la estancia.', true);
@@ -196,3 +199,17 @@ window.parkingQzRemoteHost=/Android|iPhone|iPad/i.test(navigator.userAgent)?'192
 async function checkReinforcementPrinter(){const status=reEl('reinforcementPrinterStatus');status.textContent='Comprobando conexión e impresora…';try{await connectParkingQz();const found=await qz.printers.find(PARKING_PRINTERS.ticket);if(!found||!(Array.isArray(found)?found.includes(PARKING_PRINTERS.ticket):String(found)===PARKING_PRINTERS.ticket))throw Error('No se encuentra '+PARKING_PRINTERS.ticket+' en el ordenador del parking.');status.textContent='Conexión correcta. Impresora '+PARKING_PRINTERS.ticket+' disponible.'}catch(e){status.textContent='No se pudo conectar: '+e.message}}
 let reinforcementPrintTestBusy=false;
 async function testReinforcementPrinter(){if(reinforcementPrintTestBusy)return;reinforcementPrintTestBusy=true;const status=reEl('reinforcementPrinterStatus');try{await sendParkingPrint('ticket',parkingTicketShell('Prueba de impresión Refuerzo','<h2 class="center">PRUEBA DE IMPRESIÓN</h2><p class="center"><b>REFUERZO · LAS DELICIAS</b></p><p class="center">'+reEscape(new Date().toLocaleString('es-ES'))+'</p><p class="center">No registra entradas ni cobros.</p>',100),true);status.textContent='Ticket de prueba enviado a la BIXOLON. Comprueba la salida en papel.'}catch(e){status.textContent='No se imprimió la prueba: '+e.message}finally{reinforcementPrintTestBusy=false}}
+
+let reinforcementStaySpots=[],reinforcementStaySpotSerial=0;
+function renderReinforcementStaySpots(){
+ const field=reEl('staySpot'),previous=field.value,type=reEl('type').value;
+ const free=reinforcementStaySpots.filter(s=>(s.types||[]).includes(type));
+ field.innerHTML='<option value="">Sin plaza asignada (opcional)</option>'+free.map(s=>'<option value="'+reEscape(s.id)+'">'+reEscape(s.code)+'</option>').join('');
+ field.value=free.some(s=>s.id===previous)?previous:'';
+}
+async function reloadReinforcementStaySpots(){
+ if(!reinforcementCode)return;const serial=++reinforcementStaySpotSerial;
+ try{const data=await reCall('parking_reinforcement_stay_spots',{p_code:reinforcementCode});if(serial!==reinforcementStaySpotSerial)return;reinforcementStaySpots=data||[];renderReinforcementStaySpots();}
+ catch(e){if(serial===reinforcementStaySpotSerial){reinforcementStaySpots=[];renderReinforcementStaySpots();}throw e;}
+}
+reEl('type').addEventListener('change',renderReinforcementStaySpots);
