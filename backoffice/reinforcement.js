@@ -83,9 +83,7 @@ async function enter() {
     const xlType = data.types.find(t => String(t.code || t.name || '').trim().toUpperCase() === 'XL');
     if (xlType) reEl('type').value = String(xlType.id);
     reEl('days').innerHTML = Array.from({length:24}, (_,i) => '<option value="' + (i+1) + '">' + (i+1) + (i ? ' días' : ' día') + '</option>').join('');
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    reEl('start').value = now.toISOString().slice(0,16);
+    refreshReinforcementStayDates();
     reEl('login').classList.add('hidden');
     reEl('work').classList.remove('hidden');
     tab('rotation');
@@ -97,6 +95,7 @@ async function enter() {
   }
 }
 function tab(name) {
+  if(name==='stay')refreshReinforcementStayDates();
   reEl('rotation').classList.toggle('hidden', name !== 'rotation');
   reEl('stay').classList.toggle('hidden', name !== 'stay');
   const plate=reEl(name==='stay'?'stayPlate':'plate');plate.focus();plate.select();
@@ -138,10 +137,25 @@ async function rotationEntry() {
     button.disabled = false;
   }
 }
+function reinforcementLocalDateTime(date){
+  const parts=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date);
+  return parts.replace(' ','T');
+}
+function refreshReinforcementStayDates(){
+  const entry=new Date(),days=Number(reEl('days').value)||1;
+  const departure=new Date(entry.getTime()+days*86400000);
+  reEl('start').value=reinforcementLocalDateTime(entry);
+  reEl('stayEnd').value=reinforcementLocalDateTime(departure);
+  reEl('stayEndDay').textContent=new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(departure);
+  return entry;
+}
+reEl('days').addEventListener('change',()=>refreshReinforcementStayDates());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!reEl('stayButton').disabled)refreshReinforcementStayDates();});
+setInterval(()=>{if(!document.hidden&&!reEl('stay').classList.contains('hidden')&&!reEl('stayButton').disabled)refreshReinforcementStayDates();},1000);
 async function createStay() {
   const button = reEl('stayButton');
   if (button.disabled) return;
-  const entry = new Date(reEl('start').value);
+  const entry = refreshReinforcementStayDates();
   if (!reEl('stayPlate').value.trim() || !reEl('model').value.trim() || Number.isNaN(entry.getTime())) {
     reShowMessage('Completa matrícula, marca/modelo y fecha de entrada.', true);
     return;
