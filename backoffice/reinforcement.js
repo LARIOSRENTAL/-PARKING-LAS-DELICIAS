@@ -156,6 +156,8 @@ async function createStay() {
   const button = reEl('stayButton');
   if (button.disabled) return;
   const entry = refreshReinforcementStayDates();
+  const staySpot=selectedReinforcementStaySpot();
+  if(reEl('staySpot').value.trim()&&!staySpot){reShowMessage('Selecciona una plaza disponible compatible o deja el campo vacío.',true);reEl('staySpot').focus();return;}
   if (!reEl('stayPlate').value.trim() || !reEl('model').value.trim() || Number.isNaN(entry.getTime())) {
     reShowMessage('Completa matrícula, marca/modelo y fecha de entrada.', true);
     return;
@@ -164,7 +166,7 @@ async function createStay() {
   try {
     const result = await reCall('parking_reinforcement_create_stay_with_spot', {
       p_code: reinforcementCode,
-      p_spot_id: reEl('staySpot').value || null,
+      p_spot_id: staySpot?.id || null,
       p_type: reEl('type').value,
       p_plate: reEl('stayPlate').value.trim().toUpperCase(),
       p_model: reEl('model').value.trim().toUpperCase(),
@@ -201,12 +203,32 @@ let reinforcementPrintTestBusy=false;
 async function testReinforcementPrinter(){if(reinforcementPrintTestBusy)return;reinforcementPrintTestBusy=true;const status=reEl('reinforcementPrinterStatus');try{await sendParkingPrint('ticket',parkingTicketShell('Prueba de impresión Refuerzo','<h2 class="center">PRUEBA DE IMPRESIÓN</h2><p class="center"><b>REFUERZO · LAS DELICIAS</b></p><p class="center">'+reEscape(new Date().toLocaleString('es-ES'))+'</p><p class="center">No registra entradas ni cobros.</p>',100),true);status.textContent='Ticket de prueba enviado a la BIXOLON. Comprueba la salida en papel.'}catch(e){status.textContent='No se imprimió la prueba: '+e.message}finally{reinforcementPrintTestBusy=false}}
 
 let reinforcementStaySpots=[],reinforcementStaySpotSerial=0;
-function renderReinforcementStaySpots(){
- const field=reEl('staySpot'),previous=field.value,type=reEl('type').value;
- const free=reinforcementStaySpots.filter(s=>(s.types||[]).includes(type));
- field.innerHTML='<option value="">Sin plaza asignada (opcional)</option>'+free.map(s=>'<option value="'+reEscape(s.id)+'">'+reEscape(s.code)+'</option>').join('');
- field.value=free.some(s=>s.id===previous)?previous:'';
+function reinforcementFreeStaySpots(){return reinforcementStaySpots.filter(s=>(s.types||[]).includes(reEl('type').value));}
+function selectedReinforcementStaySpot(){
+ const code=reinforcementSpotCode(reEl('staySpot').value),free=reinforcementFreeStaySpots();
+ if(['A','M'].includes(code))return free.filter(s=>String(s.code).toUpperCase().split('-')[0]===code).sort((a,b)=>a.code.localeCompare(b.code,'es',{numeric:true}))[0];
+ return free.find(s=>reinforcementSpotCode(s.code)===code);
 }
+function renderReinforcementStaySpots(){
+ const field=reEl('staySpot'),previous=field.value,free=reinforcementFreeStaySpots();
+ reEl('staySpotOptions').innerHTML=free.map(s=>'<option value="'+reEscape(s.code)+'"></option>').join('');
+ const selected=free.find(s=>reinforcementSpotCode(s.code)===reinforcementSpotCode(previous));
+ field.value=selected?selected.code:'';field.setAttribute('list','staySpotOptions');
+ reEl('staySpotHelp').textContent='Opcional. Escribe para filtrar; A o M selecciona la primera libre. Se puede cambiar después en Reservas.';
+}
+function completeReinforcementStayZone(){
+ const field=reEl('staySpot'),zone=reinforcementSpotCode(field.value);if(!['A','M'].includes(zone))return;
+ const spot=selectedReinforcementStaySpot();if(!spot){reEl('staySpotHelp').textContent='No hay plazas '+zone+' disponibles para este vehículo. Puedes dejar el campo vacío.';return;}
+ field.value=spot.code;field.removeAttribute('list');field.setSelectionRange(field.value.length,field.value.length);
+ reEl('staySpotHelp').textContent='Primera plaza libre: '+spot.code+'. Se puede cambiar después en Reservas.';
+}
+let reinforcementStayZoneTimer;
+reEl('staySpot').addEventListener('input',event=>{clearTimeout(reinforcementStayZoneTimer);reEl('staySpot').setAttribute('list','staySpotOptions');if(!event.isComposing&&!String(event.inputType||'').startsWith('delete'))reinforcementStayZoneTimer=setTimeout(completeReinforcementStayZone,0);});
+reEl('staySpot').addEventListener('compositionend',()=>{clearTimeout(reinforcementStayZoneTimer);reinforcementStayZoneTimer=setTimeout(completeReinforcementStayZone,0);});
+reEl('staySpot').addEventListener('change',completeReinforcementStayZone);
+reEl('staySpot').addEventListener('blur',completeReinforcementStayZone);
+reEl('staySpot').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();completeReinforcementStayZone();reEl('days').focus();}});
+
 async function reloadReinforcementStaySpots(){
  if(!reinforcementCode)return;const serial=++reinforcementStaySpotSerial;
  try{const data=await reCall('parking_reinforcement_stay_spots',{p_code:reinforcementCode});if(serial!==reinforcementStaySpotSerial)return;reinforcementStaySpots=data||[];renderReinforcementStaySpots();}
