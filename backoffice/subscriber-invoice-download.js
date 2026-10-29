@@ -1,10 +1,10 @@
 /* Selected documents use the existing invoice preview; viewing never records payments. */
 let subscriberInvoiceDownloadBusy=false,selectedSubscriberPreviewDocuments=null;
 function selectBankSubscriberInvoices(){if(!['admin','manager'].includes(currentProfile?.role))return;selectedSubscribers.clear();for(const check of document.querySelectorAll('#subscribersBody .subscriberCheck')){const s=monthlySubscribers.find(x=>x.id===check.value);check.checked=!!s&&subscriberIsBank(s);if(check.checked)selectedSubscribers.add(check.value);}opsEl('subscriberDownloadStatus').textContent=selectedSubscribers.size+' abonado(s) por banco seleccionados.';}
-function buildSelectedSubscriberInvoiceHtml(documents,includeInternalReceipt=false){
+function buildSelectedSubscriberInvoiceHtml(documents){
  const parser=new DOMParser(),styles=[],pages=[];
  documents.forEach((invoice,i)=>{
-  const doc=parser.parseFromString(buildParkingInvoiceHtml(invoice,{includeInternalReceipt}),'text/html'),id='selected-invoice-'+i;
+  const doc=parser.parseFromString(buildParkingInvoiceHtml(invoice),'text/html'),id='selected-invoice-'+i;
   // Scope each original template so receipts and invoices keep their own layout.
   for(const style of doc.querySelectorAll('style')){
    const sheet=new CSSStyleSheet();sheet.replaceSync(style.textContent);
@@ -21,7 +21,7 @@ function buildSelectedSubscriberInvoiceHtml(documents,includeInternalReceipt=fal
 const subscriberSingleInvoicePreview=showParkingInvoicePreview,subscriberSingleInvoicePrint=printParkingInvoicePreview,subscriberSingleInvoiceSave=saveParkingInvoiceForEmail,subscriberSingleInvoiceClose=closeParkingInvoicePreview;
 showParkingInvoicePreview=function(invoice){selectedSubscriberPreviewDocuments=null;subscriberSingleInvoicePreview(invoice);};
 closeParkingInvoicePreview=function(){selectedSubscriberPreviewDocuments=null;subscriberSingleInvoiceClose();};
-printParkingInvoicePreview=async function(){if(!selectedSubscriberPreviewDocuments)return subscriberSingleInvoicePrint();const html=buildSelectedSubscriberInvoiceHtml(selectedSubscriberPreviewDocuments,true);try{await sendParkingPrint('invoice',html);}catch(e){if(confirm('No se pudo enviar a FACTURAS: '+e.message+'\n\n¿Abrir la impresión convencional?'))await printParkingInvoiceInBrowser(html);}};
+printParkingInvoicePreview=async function(){if(!selectedSubscriberPreviewDocuments)return subscriberSingleInvoicePrint();const html=buildSelectedSubscriberInvoiceHtml(selectedSubscriberPreviewDocuments);try{await sendParkingPrint('invoice',html);}catch(e){if(confirm('No se pudo enviar a FACTURAS: '+e.message+'\n\n¿Abrir la impresión convencional?'))await printParkingInvoiceInBrowser(html);}};
 saveParkingInvoiceForEmail=async function(){if(!selectedSubscriberPreviewDocuments)return subscriberSingleInvoiceSave();await printParkingInvoiceInBrowser(buildSelectedSubscriberInvoiceHtml(selectedSubscriberPreviewDocuments));};
 async function viewSelectedSubscriberInvoices(){
  if(subscriberInvoiceDownloadBusy||!['admin','manager'].includes(currentProfile?.role))return;

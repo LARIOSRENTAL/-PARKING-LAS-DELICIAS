@@ -41,7 +41,7 @@ async function confirmHotelBatchPayment(id){
   const r=await db.rpc('parking_collect_hotel_batch',{p_batch_id:id,p_payment_method:opsEl('hotelPayMethod').value,p_print_ticket:!customer&&opsEl('hotelPayTicket').checked,p_invoice_customer:customer});if(r.error)throw r.error;
   paymentRecorded=true;status.textContent='Cobro registrado.';button.textContent='Cobro registrado';
   const data=r.data;let printError=null;
-  try{if(data.invoice)await sendParkingPrint('invoice',buildParkingInvoiceHtml(data.invoice,{includeInternalReceipt:true}));else if(data.receipt)await printParkingThermal(buildSimplifiedTicket(data.receipt))}catch(e){printError=e}
+  try{if(data.invoice)await sendParkingPrint('invoice',buildParkingInvoiceHtml(data.invoice));else if(data.receipt)await printParkingThermal(buildSimplifiedTicket(data.receipt))}catch(e){printError=e}
   closeParkingOpsModal();await loadParkingHotels();if(currentProfile?.role==='admin'||currentProfile?.role==='manager')await loadIssuedParkingInvoices();
   if(opsEl('cashbook')?.classList.contains('active'))await loadCashbook();
   if(printError){if(data.invoice)showParkingInvoicePreview(data.invoice);alert('El pago quedó registrado. No se pudo imprimir: '+printError.message+'. Usa Ticket / factura para reimprimir sin volver a cobrar.')}
