@@ -42,3 +42,11 @@ function parkingHtmlPrintData(kind,html){
  if(kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')data.options={pageWidth:285,pageHeight:198};
  return data;
 }
+
+function parkingMonthlyReceiptPrintConfig(){return {copies:1,color:false,units:'mm',orientation:'portrait',size:{width:210,height:297},margins:0,scaleContent:true,rasterize:true};}
+function parkingCenteredMonthlyReceiptHtml(html){
+ const doc=new DOMParser().parseFromString(html,'text/html');
+ for(const style of doc.querySelectorAll('style'))style.textContent=style.textContent.replace(/@page\s*\{[^}]*\}/gi,'@page{size:A4 portrait;margin:0}');
+ const style=doc.createElement('style');style.textContent='@page{size:A4 portrait;margin:0}html,body{width:210mm!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}.subscriberInvoiceDocument{width:210mm!important;height:297mm!important;max-height:297mm!important}.monthly-receipt-copies{box-sizing:border-box!important;width:180mm!important;max-width:180mm!important;height:297mm!important;margin:0 auto!important;padding:5mm 4mm!important;display:flex!important;flex-direction:column!important;justify-content:center!important;gap:0!important;break-inside:avoid!important}.monthly-receipt-copies>.receipt{flex:0 0 auto!important;width:100%!important;min-height:100mm!important;margin:0!important}.monthly-receipt-cut{flex:none!important}';
+ doc.head.appendChild(style);return '<!doctype html>'+doc.documentElement.outerHTML;
+}
