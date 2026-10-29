@@ -1,0 +1,35 @@
+name: Validate bank subscriber invoices
+on:
+  push:
+    branches: [bank-invoices-validation-20261029]
+  pull_request:
+    paths:
+      - 'backoffice/subscriber-invoice-download.js'
+      - 'database/automatic_bank_monthly_invoices.sql'
+      - 'tests/bank-invoices/**'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save @electric-sql/pglite@0.5.12 playwright@1.56.1 pdf-lib@1.17.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/bank-invoices/database.cjs
+      - run: node tests/bank-invoices/browser.cjs
+      - name: Render PDF pages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+          pdftoppm -r 80 -png qa/bank-invoices/facturas-prueba.pdf qa/bank-invoices/pagina
+          pdfinfo qa/bank-invoices/facturas-prueba.pdf
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank-invoice-validation
+          path: qa/bank-invoices/
