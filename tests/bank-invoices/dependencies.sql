@@ -35,8 +35,7 @@ begin
  insert into public.parking_cash_movements(source_key,category,entity_type,entity_id,reference,plate,description,amount_eur,payment_method,paid_at,user_id,shift_id,employee_name,details)
  values(v_key,v_category,v_type,v_entity,coalesce(v_ref,''),v_plate,coalesce(v_desc,''),round(v_amount,2),v_method,v_paid,v_user,v_shift,v_name,v_details) on conflict(source_key) do nothing;
  return new;
-end $function$
-
+end $function$;
 CREATE OR REPLACE FUNCTION private.snapshot_subscriber_month_payment()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -50,4 +49,4 @@ begin
  if (q->>'invoice_requires_review')::boolean then raise exception 'La factura de este mes tiene un importe diferente. Revisa su rectificación antes de cobrar la cuota actualizada';end if;
  new.pricing_snapshot:=q;
  return new;
-end$function$
+end$function$;

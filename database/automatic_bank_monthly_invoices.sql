@@ -32,7 +32,7 @@ begin
  return jsonb_build_object('processed',ok,'errors',failed,'month',month);
 end;$$;
 revoke all on function private.parking_auto_bank_month(timestamptz) from public,anon,authenticated;
-select cron.schedule('parking-automatic-bank-month','*/5 * 1 * *','select private.parking_auto_bank_month()');
+select cron.schedule('parking-automatic-bank-month','*/5 * * * *','select private.parking_auto_bank_month()');
 create or replace function public.parking_selected_subscriber_documents(p_ids uuid[],p_month date) returns jsonb language plpgsql security definer set search_path='' as $$
 declare docs jsonb:='[]';missing jsonb:='[]';s public.monthly_subscribers;f public.parking_invoices;r public.parking_monthly_receipts;v_role text;
 begin
