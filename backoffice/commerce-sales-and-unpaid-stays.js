@@ -140,7 +140,7 @@ function subscriberPaymentPrintData(document){
  const c=document.payment_context||{},automatic=!!c.automatic_bank_payment;
  const date=(value,withTime=false)=>{if(!value)return 'No consta';const d=new Date(value);return Number.isNaN(d.getTime())?'No consta':d.toLocaleString('es-ES',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit',...(withTime?{hour:'2-digit',minute:'2-digit',second:'2-digit'}:{})});};
  const shift=c.shift_code?'T'+c.shift_code:c.shift_number?'Turno '+c.shift_number:'No consta';
- return {employee:c.employee_name||(automatic?'AUTOMÁTICO · BANCO':'No consta'),shift:automatic?'Sin turno · pago automático':shift+(c.shift_date?' · '+c.shift_date.split('-').reverse().join('/'):''),paid:date(c.paid_at,true)};
+ return {employee:c.employee_name||(automatic?'AUTOMÁTICO · BANCO':'No consta'),shift:automatic&&!c.shift_code&&!c.shift_number?'Sin turno · pago automático':shift+(c.shift_date?' · '+c.shift_date.split('-').reverse().join('/'):''),paid:date(c.paid_at,true)};
 }
 function addSubscriberPaymentDetails(html,document){
  const page=new DOMParser().parseFromString(html,'text/html'),data=subscriberPaymentPrintData(document),safe=s=>esc(String(s));
