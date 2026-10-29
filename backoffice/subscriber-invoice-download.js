@@ -1,27 +1,43 @@
-/* Selected monthly documents are read-only; PDF download never posts a payment. */
-let subscriberPdfLibraries=null,subscriberInvoiceDownloadBusy=false,subscriberInvoicePdfUrl=null;
-function loadSubscriberPdfLibraries(){if(subscriberPdfLibraries)return subscriberPdfLibraries;const load=(src,ready)=>ready()?Promise.resolve():new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=()=>ready()?resolve():reject(Error('No se pudo inicializar el generador PDF.'));script.onerror=()=>reject(Error('No se pudo cargar '+src));document.head.appendChild(script);});subscriberPdfLibraries=(async()=>{await load('assets/vendor/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF);await load('assets/vendor/html2canvas.min.js',()=>!!window.html2canvas);})().catch(e=>{subscriberPdfLibraries=null;throw e;});return subscriberPdfLibraries;}
-function subscriberPdfTimeout(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('No se pudo completar '+label+'. Vuelve a intentarlo.')),ms);})]).finally(()=>clearTimeout(timer));}
-async function buildSelectedSubscriberPdf(documents,onProgress=()=>{}){
- await loadSubscriberPdfLibraries();const pdf=new window.jspdf.jsPDF({format:'a4',unit:'mm',compress:true});
- for(let i=0;i<documents.length;i++){
-  onProgress('Preparando documento '+(i+1)+' de '+documents.length+'…');
-  const frame=document.createElement('iframe');frame.setAttribute('aria-hidden','true');frame.style.cssText='position:fixed;left:-20000px;top:0;width:794px;height:1123px;border:0;background:white';document.body.appendChild(frame);
-  try{
-   const ready=new Promise(resolve=>frame.onload=resolve);frame.srcdoc=buildParkingInvoiceHtml(documents[i],{includeInternalReceipt:true});await subscriberPdfTimeout(ready,15000,'la carga de la factura');
-   const doc=frame.contentDocument;const style=doc.createElement('style');style.textContent='html,body{margin:0!important;padding:0!important;background:white!important;width:196mm!important;height:auto!important;overflow:visible!important}.page{margin:0!important;width:196mm!important;height:278mm!important}.receipt:not(.page .receipt){margin:0!important;width:196mm!important;max-width:196mm!important}';doc.head.appendChild(style);
-   if(doc.fonts?.ready)await subscriberPdfTimeout(doc.fonts.ready,5000,'las fuentes');
-   await subscriberPdfTimeout(Promise.all([...doc.images].map(img=>img.complete?(img.naturalWidth?Promise.resolve():Promise.reject(Error('No se pudo cargar el logo original.'))):new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('No se pudo cargar el logo original.'));}))),15000,'el logo');
-   const page=doc.querySelector('.page')||doc.querySelector('main.receipt')||doc.body;
-   const canvas=await subscriberPdfTimeout(window.html2canvas(page,{backgroundColor:'#fff',scale:1.7,useCORS:true,logging:false,windowWidth:794,windowHeight:1123}),30000,'el documento PDF');
-   if(i)pdf.addPage();const width=196,height=Math.min(278,canvas.height*width/canvas.width);pdf.addImage(canvas.toDataURL('image/jpeg',0.94),'JPEG',7,9,width,height,undefined,'FAST');canvas.width=canvas.height=0;
-  }finally{frame.remove();}
- }
- return pdf.output('blob');
-}
+/* Selected documents use the existing invoice preview; viewing never records payments. */
+let subscriberInvoiceDownloadBusy=false,selectedSubscriberPreviewDocuments=null;
 function selectBankSubscriberInvoices(){if(!['admin','manager'].includes(currentProfile?.role))return;selectedSubscribers.clear();for(const check of document.querySelectorAll('#subscribersBody .subscriberCheck')){const s=monthlySubscribers.find(x=>x.id===check.value);check.checked=!!s&&subscriberIsBank(s);if(check.checked)selectedSubscribers.add(check.value);}opsEl('subscriberDownloadStatus').textContent=selectedSubscribers.size+' abonado(s) por banco seleccionados.';}
-function showSubscriberInvoicePdf(url,filename){let modal=opsEl('subscriberInvoicePdfModal');if(!modal){modal=document.createElement('div');modal.id='subscriberInvoicePdfModal';modal.style.cssText='position:fixed;inset:0;z-index:24000;background:#142b40e8;padding:12px;display:flex;flex-direction:column;gap:8px';modal.innerHTML='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:white;padding:10px"><b>Facturas seleccionadas · una por página</b><a id="subscriberInvoicePdfDownload" class="btn green">Descargar PDF</a><button class="btn light" id="subscriberInvoicePdfOpen">Abrir PDF para imprimir</button><button class="btn light" id="subscriberInvoicePdfClose">Cerrar</button></div><iframe id="subscriberInvoicePdfFrame" title="PDF de facturas seleccionadas" style="flex:1;min-height:0;width:100%;background:white;border:0"></iframe>';document.body.appendChild(modal);opsEl('subscriberInvoicePdfClose').onclick=()=>modal.style.display='none';}modal.style.display='flex';const link=opsEl('subscriberInvoicePdfDownload');link.href=url;link.download=filename;opsEl('subscriberInvoicePdfOpen').onclick=()=>window.open(url,'_blank','noopener');opsEl('subscriberInvoicePdfFrame').src=url;link.click();}
-async function downloadSelectedSubscriberInvoices(){if(subscriberInvoiceDownloadBusy||!['admin','manager'].includes(currentProfile?.role))return;const ids=[...selectedSubscribers],status=opsEl('subscriberDownloadStatus');if(!ids.length){status.textContent='Selecciona los clientes del listado.';return;}subscriberInvoiceDownloadBusy=true;opsEl('downloadSubscriberInvoices').disabled=true;const month=billingMonth();try{status.textContent='Consultando documentos emitidos…';const r=await db.rpc('parking_selected_subscriber_documents',{p_ids:ids,p_month:month+'-01'});if(r.error)throw r.error;const docs=r.data.documents||[],missing=r.data.missing||[];if(!docs.length)throw Error('No hay documentos emitidos para los clientes y el mes seleccionados. Los abonados por banco se facturan automáticamente el día 1.');const blob=await buildSelectedSubscriberPdf(docs,text=>status.textContent=text);if(subscriberInvoicePdfUrl)URL.revokeObjectURL(subscriberInvoicePdfUrl);subscriberInvoicePdfUrl=URL.createObjectURL(blob);showSubscriberInvoicePdf(subscriberInvoicePdfUrl,'facturas-abonados-'+month+'.pdf');status.textContent=docs.length+' documento(s) en un PDF.'+(missing.length?' Sin documento emitido: '+missing.map(s=>s.name+' ('+s.plate+')').join(', ')+'.':'');}catch(e){status.textContent='No se pudo descargar: '+e.message;}finally{subscriberInvoiceDownloadBusy=false;opsEl('downloadSubscriberInvoices').disabled=false;}}
-(function mountSubscriberInvoiceDownloads(){const panel=document.createElement('div');panel.id='subscriberInvoiceDownloadPanel';panel.className='panel hidden';panel.innerHTML='<button class="btn light" onclick="selectBankSubscriberInvoices()">Seleccionar abonados por banco</button><button id="downloadSubscriberInvoices" class="btn green" onclick="downloadSelectedSubscriberInvoices()">Descargar facturas</button><p id="subscriberDownloadStatus" role="status" class="muted">Selecciona clientes del listado y descarga sus documentos del mes en un único PDF.</p>';const section=opsEl('subscribers');section.insertBefore(panel,section.children[1]);})();
+function buildSelectedSubscriberInvoiceHtml(documents,includeInternalReceipt=false){
+ const parser=new DOMParser(),styles=[],pages=[];
+ documents.forEach((invoice,i)=>{
+  const doc=parser.parseFromString(buildParkingInvoiceHtml(invoice,{includeInternalReceipt}),'text/html'),id='selected-invoice-'+i;
+  // Scope each original template so receipts and invoices keep their own layout.
+  for(const style of doc.querySelectorAll('style')){
+   const sheet=new CSSStyleSheet();sheet.replaceSync(style.textContent);
+   const scoped=rules=>Array.from(rules).map(rule=>{
+    if(rule.type===CSSRule.STYLE_RULE){const selectors=rule.selectorText.split(',').map(s=>{s=s.trim();return /^(html|body)$/.test(s)?'#'+id:'#'+id+' '+s.replace(/^(html\s+body|html|body)\s+/,'');});return selectors.join(',')+'{'+rule.style.cssText+'}';}
+    if(rule.cssRules)return rule.cssText.slice(0,rule.cssText.indexOf('{')+1)+scoped(rule.cssRules)+'}';
+    return rule.cssText;
+   }).join('');styles.push(scoped(sheet.cssRules));
+  }
+  doc.querySelectorAll('script,style').forEach(el=>el.remove());pages.push('<section class="subscriberInvoiceDocument" id="'+id+'">'+doc.body.innerHTML+'</section>');
+ });
+ return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Facturas seleccionadas</title><style>'+styles.join('\n')+'\n*{box-sizing:border-box}body{margin:0;background:#ddd}.subscriberInvoiceDocument{font:12px "Times New Roman",serif;color:#111}@media print{@page{size:A4 portrait;margin:7mm}html,body{width:196mm;height:auto!important;overflow:visible!important;background:#fff}.subscriberInvoiceDocument{width:196mm;height:278mm;max-height:278mm;overflow:hidden;break-inside:avoid;break-after:page;page-break-after:always}.subscriberInvoiceDocument:last-child{break-after:auto;page-break-after:auto}.subscriberInvoiceDocument .page{margin:0!important}}</style></head><body>'+pages.join('')+'</body></html>';
+}
+const subscriberSingleInvoicePreview=showParkingInvoicePreview,subscriberSingleInvoicePrint=printParkingInvoicePreview,subscriberSingleInvoiceSave=saveParkingInvoiceForEmail,subscriberSingleInvoiceClose=closeParkingInvoicePreview;
+showParkingInvoicePreview=function(invoice){selectedSubscriberPreviewDocuments=null;subscriberSingleInvoicePreview(invoice);};
+closeParkingInvoicePreview=function(){selectedSubscriberPreviewDocuments=null;subscriberSingleInvoiceClose();};
+printParkingInvoicePreview=async function(){if(!selectedSubscriberPreviewDocuments)return subscriberSingleInvoicePrint();const html=buildSelectedSubscriberInvoiceHtml(selectedSubscriberPreviewDocuments,true);try{await sendParkingPrint('invoice',html);}catch(e){if(confirm('No se pudo enviar a FACTURAS: '+e.message+'\n\n¿Abrir la impresión convencional?'))await printParkingInvoiceInBrowser(html);}};
+saveParkingInvoiceForEmail=async function(){if(!selectedSubscriberPreviewDocuments)return subscriberSingleInvoiceSave();await printParkingInvoiceInBrowser(buildSelectedSubscriberInvoiceHtml(selectedSubscriberPreviewDocuments));};
+async function viewSelectedSubscriberInvoices(){
+ if(subscriberInvoiceDownloadBusy||!['admin','manager'].includes(currentProfile?.role))return;
+ const ids=[...selectedSubscribers],status=opsEl('subscriberDownloadStatus');if(!ids.length){status.textContent='Selecciona los clientes del listado.';return;}
+ subscriberInvoiceDownloadBusy=true;opsEl('downloadSubscriberInvoices').disabled=true;
+ try{status.textContent='Consultando documentos emitidos…';const r=await db.rpc('parking_selected_subscriber_documents',{p_ids:ids,p_month:billingMonth()+'-01'});if(r.error)throw r.error;const docs=r.data.documents||[],missing=r.data.missing||[];if(!docs.length)throw Error('No hay documentos emitidos para los clientes y el mes seleccionados.');
+  showParkingInvoicePreview(docs[0]);selectedSubscriberPreviewDocuments=docs;
+  opsEl('parkingInvoicePreviewTitle').textContent='Facturas seleccionadas · '+docs.length+' documento(s)';opsEl('parkingInvoiceFrame').srcdoc=buildSelectedSubscriberInvoiceHtml(docs);
+  status.textContent=docs.length+' documento(s) abiertos.'+(missing.length?' Sin documento emitido: '+missing.map(s=>s.name+' ('+s.plate+')').join(', ')+'.':'');
+ }catch(e){status.textContent='No se pudieron abrir las facturas: '+e.message;}finally{subscriberInvoiceDownloadBusy=false;opsEl('downloadSubscriberInvoices').disabled=false;}
+}
+// Keep older inline links compatible without downloading automatically.
+async function downloadSelectedSubscriberInvoices(){return viewSelectedSubscriberInvoices();}
+(function mountSubscriberInvoiceDownloads(){
+ const actions=opsEl('subscriberListActions'),button=document.createElement('button');button.id='downloadSubscriberInvoices';button.className='btn green hidden';button.textContent='Ver facturas seleccionadas';button.onclick=viewSelectedSubscriberInvoices;actions.prepend(button);
+ const panel=document.createElement('div');panel.id='subscriberInvoiceDownloadPanel';panel.className='hidden';panel.innerHTML='<button class="mini" onclick="selectBankSubscriberInvoices()">Seleccionar abonados por banco</button><span id="subscriberDownloadStatus" role="status" class="muted" style="margin-left:10px">Selecciona clientes para ver sus facturas del mes.</span>';const body=opsEl('subscribersBody');body.before(panel);panel.style.marginBottom='12px';
+})();
 const renderBeforeInvoiceDownloads=renderMonthlySubscribers;
-renderMonthlySubscribers=function(){renderBeforeInvoiceDownloads();opsEl('subscriberInvoiceDownloadPanel').classList.toggle('hidden',!['admin','manager'].includes(currentProfile?.role));};
+renderMonthlySubscribers=function(){renderBeforeInvoiceDownloads();const canManage=['admin','manager'].includes(currentProfile?.role);for(const id of ['subscriberInvoiceDownloadPanel','downloadSubscriberInvoices','subscriberScheduledEnds','subscriberScheduledStarts'])opsEl(id).classList.toggle('hidden',!canManage);for(const [id,mode]of [['subscriberScheduledEnds','ends'],['subscriberScheduledStarts','starts']]){const b=opsEl(id),active=subscriberListMode===mode;b.classList.toggle('dark',active);b.classList.toggle('light',!active);b.setAttribute('aria-pressed',String(active));}};
