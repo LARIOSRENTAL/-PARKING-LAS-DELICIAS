@@ -1,4 +1,4 @@
-const PARKING_PRINTERS={invoice:'FACTURAS',monthly_receipt:'HOJA DE CAJA',stay:'RICOH MP 2003',cashbook:'HOJA DE CAJA',withdrawal:'HOJA DE CAJA',cashvale:'HOJA DE CAJA',cashexpense:'HOJA DE CAJA',ticket:'BIXOLON SRP-350III'};
+const PARKING_PRINTERS={invoice:'FACTURAS',stay:'RICOH MP 2003',cashbook:'HOJA DE CAJA',withdrawal:'HOJA DE CAJA',cashvale:'HOJA DE CAJA',cashexpense:'HOJA DE CAJA',ticket:'BIXOLON SRP-350III'};
 const PARKING_QZ_IDENTITY_DB='parking-qz-identity-v1';
 let parkingQzIdentity=null,parkingQzSigningLoaded=false;
 function parkingQzIdentityStore(mode,identity){return new Promise((resolve,reject)=>{const request=indexedDB.open(PARKING_QZ_IDENTITY_DB,1);request.onupgradeneeded=()=>request.result.createObjectStore('identity');request.onerror=()=>reject(new Error('Chrome no permite guardar la autorización local de QZ.'));request.onsuccess=()=>{const database=request.result;const tx=database.transaction('identity',mode);const store=tx.objectStore('identity');let result=null;const op=mode==='readwrite'?store.put(identity,'current'):store.get('current');op.onsuccess=()=>{result=op.result};tx.oncomplete=()=>{database.close();resolve(mode==='readwrite'?identity:result||null)};tx.onabort=()=>{database.close();reject(new Error('No se pudo guardar o leer la autorización local de QZ.'))}}})}
@@ -24,17 +24,6 @@ async function connectParkingQz(){
 }
 function hotelCouponPrintPages(html){const doc=new DOMParser().parseFromString(html,'text/html');const coupons=Array.from(doc.querySelectorAll('.coupon'));if(!coupons.length)throw new Error('No se encontraron bonos de hotel para imprimir.');return coupons.map(coupon=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+coupon.outerHTML+'</body></html>')}
 async function sendParkingPrint(kind,html,officeOnly=false){
- // Only monthly receipt markup can opt into the cashbook printer contract.
- if(kind==='invoice'&&html.includes('monthly-receipt-copies')){
-  const doc=new DOMParser().parseFromString(html,'text/html');
-  if(doc.querySelector('.monthly-receipt-copies')){
-   const sections=[...doc.querySelectorAll('.subscriberInvoiceDocument')];
-   if(sections.length){let sent=0;try{for(const section of sections){const copy=doc.cloneNode(true);copy.body.replaceChildren(section.cloneNode(true));await sendParkingPrint(section.querySelector('.monthly-receipt-copies')?'monthly_receipt':'invoice','<!doctype html>'+copy.documentElement.outerHTML,officeOnly);sent++;}}catch(e){throw Error('Se han preparado/enviado '+sent+' de '+sections.length+' documentos. Revisa la cola antes de repetir. '+e.message);}return true;}
-   kind='monthly_receipt';
-  }
- }
- if(kind==='monthly_receipt')html=parkingMonthlyReceiptCashbookHtml(html);
-
  if(!officeOnly&&typeof shouldPreviewParkingPrint==='function'&&shouldPreviewParkingPrint())return prepareAdminPrintPreview(kind,html);
  await connectParkingQz();
  const target=PARKING_PRINTERS[kind];
@@ -46,7 +35,7 @@ async function sendParkingPrint(kind,html,officeOnly=false){
  try{
   const hotelHtml=kind==='stay'&&html.includes('Bonos hotel ');
   const jobHtml=hotelHtml?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;margin:0!important;padding:0!important}.coupon{width:100mm!important;height:210mm!important;break-after:page!important}.coupon:last-child{break-after:auto!important}</style></head>'):kind==='stay'?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;height:210mm!important;margin:0!important;overflow:hidden!important}.ticket{margin:0 auto!important}.actions{display:none!important}</style></head>'):html;
-  const cfg=kind==='ticket'?parkingThermalPrintConfig(html):kind==='stay'?parkingStayPrintConfig():(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense'||kind==='monthly_receipt')?await parkingCashbookPrintConfigForPrinter(target,kind):{copies:1,color:false};
+  const cfg=kind==='ticket'?parkingThermalPrintConfig(html):kind==='stay'?parkingStayPrintConfig():(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')?await parkingCashbookPrintConfigForPrinter(target,kind):{copies:1,color:false};
   if(hotelHtml){const pages=hotelCouponPrintPages(jobHtml);let sent=0;try{for(const pageHtml of pages){parkingQzStage='Enviando bono de hotel '+(sent+1)+' de '+pages.length+' a '+target;await qz.print(qz.configs.create(target,parkingStayPrintConfig()),[parkingHtmlPrintData('stay',pageHtml)]);sent++}}catch(e){throw new Error('Se han enviado '+sent+' de '+pages.length+' bonos a la cola. No repitas la tanda completa para evitar duplicados. Detalle: '+(e.message||e))}}
   else await qz.print(qz.configs.create(target,cfg),[parkingHtmlPrintData(kind,jobHtml)])
  }
