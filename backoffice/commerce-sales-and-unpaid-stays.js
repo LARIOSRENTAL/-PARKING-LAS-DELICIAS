@@ -23,7 +23,7 @@ createManualReservation=async function(){
  if(manualStayCreateBusy)return;
  const b=document.querySelector('#manual button[onclick="createManualReservation()"]'),msg=opsEl('manualMsg');
  const plate=opsEl('mPlate').value.trim(),model=opsEl('mModel').value.trim();
- if(plate.length<3||model.length<2)return msg.textContent='Completa matrícula y marca/modelo.';
+ if(plate.length<3||model.length<1)return msg.textContent='Completa matrícula y marca/modelo.';
  manualStayCreateBusy=true;if(b)b.disabled=true;
  try{
  const dates=readManualStayDates();
@@ -106,7 +106,7 @@ function manualStayKeyboardFields(){const ids=['mPlate','mModel','mType','mEntry
 function validateManualStayKeyboardField(field){
  const message=opsEl('manualMsg');let error='';
  if(field.id==='mPlate'&&normalizeRotationPlate(field.value).length<3)error='Introduce una matrícula válida.';
- if(field.id==='mModel'&&field.value.trim().length<2)error='Introduce la marca / modelo.';
+ if(field.id==='mModel'&&field.value.trim().length<1)error='Introduce la marca / modelo.';
  if(['mType','mEntry','mDays','mExit'].includes(field.id))field.dispatchEvent(new Event('change',{bubbles:true}));
  if(['mEntry','mDays','mExit'].includes(field.id)){try{readManualStayDates()}catch(e){error=e.message}}
  if(error){message.textContent=error;field.focus();return false}
@@ -205,3 +205,29 @@ reservationTable=function(rows,actions=false){const html=reservationTableBeforeC
 const cancellingPendingStays=new Set();
 async function cancelPendingParkingStay(id){if(cancellingPendingStays.has(id))return;const r=reservations.find(r=>r.id===id);if(!r)return;const paid=r.payment_status==='paid';if(!confirm('¿Anular la reserva '+r.reference+' · '+(r.plate||'sin matrícula')+'? Se retirará del listado de reservas.'+(paid?' Ya está pagada: se conservarán el cobro y la factura. Esta acción no realiza ninguna devolución.':'')))return;cancellingPendingStays.add(id);const buttons=[...document.querySelectorAll('[data-cancel-stay]')].filter(b=>b.dataset.cancelStay===id);buttons.forEach(b=>b.disabled=true);try{const result=await db.rpc('parking_cancel_pending_stay',{p_reservation_id:id});if(result.error)throw result.error;await refreshAll()}catch(e){alert('No se pudo anular la estancia: '+e.message)}finally{cancellingPendingStays.delete(id);buttons.forEach(b=>b.disabled=false)}}
 
+
+/* Route keyboard-wedge voucher scans without submitting the payment. */
+let stayVoucherScan=null;
+window.addEventListener('keydown',event=>{
+ const method=opsEl('stayCollectMethod')?.value,fields=[...document.querySelectorAll('.stayVoucherNumber')],modal=opsEl('parkingOpsModal');
+ if(!method?.startsWith('hotel_voucher')||!fields.length||modal?.classList.contains('hidden')){stayVoucherScan=null;return;}
+ if(event.key==='Shift')return;
+ if(event.isComposing||event.ctrlKey||event.altKey||event.metaKey){stayVoucherScan=null;return;}
+ const now=performance.now();
+ if(event.key==='Enter'||event.key==='Tab'){
+  const scan=stayVoucherScan;stayVoucherScan=null;
+  const valid=scan&&scan.text.length>=3&&now-scan.last<100&&scan.last-scan.started<=Math.max(120,scan.text.length*45)&&/^[A-Z0-9][A-Z0-9-]*$/i.test(scan.text);
+  if(!valid){if(fields.includes(event.target)&&event.key==='Enter'){event.preventDefault();event.stopImmediatePropagation();fields[fields.indexOf(event.target)+1]?.focus();}return;}
+  event.preventDefault();event.stopImmediatePropagation();
+  const target=scan.target;
+  if(target&&typeof target.value==='string'&&scan.start!==null){const expected=scan.before.slice(0,scan.start)+scan.text+scan.before.slice(scan.end);if(target.value.toUpperCase()===expected.toUpperCase())target.value=scan.before;}
+  const field=fields.includes(target)?target:fields.find(f=>!f.value.trim());
+  if(!field)return;
+  field.value=scan.text.toUpperCase();field.dispatchEvent(new Event('input',{bubbles:true}));
+  (fields[fields.indexOf(field)+1]||field).focus();return;
+ }
+ if(event.key.length!==1){stayVoucherScan=null;return;}
+ const target=event.target;
+ if(!stayVoucherScan||now-stayVoucherScan.last>80||stayVoucherScan.target!==target)stayVoucherScan={text:'',target,before:typeof target.value==='string'?target.value:'',start:target.selectionStart??null,end:target.selectionEnd??null,started:now,last:now};
+ stayVoucherScan.text+=event.key;stayVoucherScan.last=now;
+},true);

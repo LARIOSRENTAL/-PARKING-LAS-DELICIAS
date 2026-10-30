@@ -41,7 +41,7 @@ window.addEventListener('keydown',event=>{
  const now=performance.now();
  if(event.key==='Enter'||event.key==='Tab'){
   const scan=conversionScan;conversionScan=null;
-  const valid=scan&&scan.text.length>=3&&now-scan.last<100&&scan.last-scan.started<=Math.max(120,scan.text.length*45)&&(method==='hotel_voucher'?/^H-?[1-9][0-9]*$/i.test(scan.text):/^[0-9]{3,}$/.test(scan.text));
+  const valid=scan&&scan.text.length>=3&&now-scan.last<100&&scan.last-scan.started<=Math.max(120,scan.text.length*45)&&(method==='hotel_voucher'?/^H-?[1-9][0-9]*$/i.test(scan.text):/^[A-Z0-9][A-Z0-9-]*$/i.test(scan.text));
   if(!valid)return;
   event.preventDefault();event.stopImmediatePropagation();
   const field=opsEl(method==='hotel_voucher'?'convertVoucherCodes':'convertOldCodes');
