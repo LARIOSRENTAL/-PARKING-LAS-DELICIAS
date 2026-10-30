@@ -590,7 +590,7 @@ function filterHotelBatchOptions(open){
 function chooseHotelBatchName(name){const el=document.getElementById('hotelBatchHotel');if(el){el.value=name;el.focus()}hideHotelBatchOptions()}
 function toggleHotelBatchOptions(){const el=document.getElementById('hotelBatchChoices');filterHotelBatchOptions(el?.style.display!=='block')}
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#hotelBatchHotel')&&!e.target.closest('#hotelBatchChoices')&&!e.target.closest('[aria-label="Ver hoteles"]'))hideHotelBatchOptions()});
-async function loadParkingHotels(){const r=await db.from('parking_hotel_balances').select('*').order('name');if(r.error){console.error(r.error);return}parkingHotels=r.data||[];if(document.getElementById('hotelBatchChoices')?.style.display==='block')filterHotelBatchOptions(true);const names=document.getElementById('hotelNameList');if(names)names.innerHTML=parkingHotels.map(h=>'<option value="'+esc(h.name)+'"></option>').join('');const batchResult=await db.from('parking_hotel_batches').select('id,first_control,days,hotel_id,created_at,unit_price_eur,registration_first,registration_last,is_test').eq('is_void',false).order('created_at',{ascending:false}).limit(100);const batches=batchResult.data||[];const body=document.getElementById('hotelBalances');if(body)body.innerHTML='<table class="tbl"><thead><tr><th>Hotel</th><th>Comprados</th><th>Utilizados</th><th>Disponibles</th></tr></thead><tbody>'+parkingHotels.map(h=>'<tr><td>'+esc(h.name)+'</td><td>'+h.purchased_days+'</td><td>'+h.used_days+'</td><td><b>'+h.available_days+'</b></td></tr>').join('')+'</tbody></table><h3>Últimas compras de bonos</h3><div class="tableWrap"><table class="tbl"><thead><tr><th>Hotel</th><th>Nº control</th><th>Días</th><th>Acciones</th></tr></thead><tbody>'+batches.map(b=>'<tr><td>'+esc(parkingHotels.find(h=>h.id===b.hotel_id)?.name||'')+(b.is_test?' · PRUEBA':'')+'</td><td>'+esc(b.registration_first||b.first_control)+' — '+esc(b.registration_last||b.first_control)+'</td><td>'+b.days+'</td><td><button class="mini blue" onclick="printHotelVoucherBatch(\''+b.id+'\')">Reimprimir disponibles</button></td></tr>').join('')+'</tbody></table></div>'}
+async function loadParkingHotels(){const r=await db.from('parking_hotel_balances').select('*').order('name');if(r.error){console.error(r.error);return}parkingHotels=r.data||[];if(document.getElementById('hotelBatchChoices')?.style.display==='block')filterHotelBatchOptions(true);const names=document.getElementById('hotelNameList');if(names)names.innerHTML=parkingHotels.map(h=>'<option value="'+esc(h.name)+'"></option>').join('');const batchResult=await db.from('parking_hotel_batches').select('id,first_control,days,hotel_id,created_at,unit_price_eur,registration_first,registration_last,is_test').eq('is_void',false).order('created_at',{ascending:false}).limit(100);const batches=batchResult.data||[];const body=document.getElementById('hotelBalances');if(body)body.innerHTML='<table class="tbl"><thead><tr><th>Hotel</th><th>Comprados</th><th>Utilizados</th><th>Disponibles</th></tr></thead><tbody>'+parkingHotels.map(h=>'<tr><td>'+esc(h.name)+'</td><td>'+h.purchased_days+'</td><td>'+h.used_days+'</td><td><b>'+h.available_days+'</b></td></tr>').join('')+'</tbody></table><h3>Últimas compras de bonos</h3><div class="tableWrap"><table class="tbl"><thead><tr><th>Hotel</th><th>Nº control</th><th>Días</th><th>Acciones</th></tr></thead><tbody>'+batches.map(b=>'<tr><td>'+esc(parkingHotels.find(h=>h.id===b.hotel_id)?.name||'')+(b.is_test?' · PRUEBA':'')+'</td><td>'+esc(b.registration_first||b.first_control)+' — '+esc(b.registration_last||b.first_control)+'</td><td>'+b.days+'</td><td></td></tr>').join('')+'</tbody></table></div>'}
 function chosenParkingHotel(){return parkingHotels.find(h=>h.name.toLowerCase()===String(document.getElementById('mHotelName')?.value||'').trim().toLowerCase())}
 function hotelVoucherUnitPrice(days){return Number(days)>=200?12:13}
 function updateHotelBatchTotal(){const days=Math.max(0,Number(document.getElementById('hotelBatchDays').value)||0);document.getElementById('hotelBatchTotal').textContent=money(days*hotelVoucherUnitPrice(days))}
@@ -638,11 +638,11 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="entry-ticket.js?v=center-spot-code-20261029"></script>
 <script src="operations.js?v=direct-invoice-checkout-20261029"></script><script src="rotation-commerce.js?v=commerce-value-fast-scan-20261020"></script>
 <script src="blacklist.js?v=20261015"></script>
-<script src="hotel-vouchers.js?v=stay-flow-20261019-conversion-print-20261019-voucher-enter-20261016"></script>
+<script src="hotel-vouchers.js?v=hotel-actions-end-date-20261030"></script>
 <script src="bank-invoice-mail.js?v=subscriber-method-20261017"></script>
 
 <script src="authorized-plates.js?v=entry-warning-20261026"></script>
-<script src="hotel-payments.js?v=invoice-without-stub-20261029"></script>
+<script src="hotel-payments.js?v=hotel-actions-end-date-20261030"></script>
 <script src="stay-completion.js?v=early-release-and-plaza-sort-20261021"></script>
 <script src="staff-users.js?v=access-20261017-users-20261016"></script>
 <script src="rotation-spots.js?v=client-keys-20261029"></script>
@@ -656,7 +656,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="subscriber-plates.js?v=complete-20261026"></script>
 <script src="shared-availability.js?v=complete-20261026"></script>
 <script src="commerce-sales-and-unpaid-stays.js?v=invoice-without-stub-20261029"></script>
-<script src="rotation-to-stay.js?v=manual-category-20261028"></script>
+<script src="rotation-to-stay.js?v=hotel-actions-end-date-20261030"></script>
 <script src="reservation-spots.js?v=optional-refuerzo-20261028"></script>
 <script src="rotation-scan-guard.js?v=explicit-checkout-20261028"></script>
 <script src="subscriber-management.js?v=scheduled-lists-20261029"></script>
