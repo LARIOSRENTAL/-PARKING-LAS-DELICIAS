@@ -37,6 +37,7 @@ function parkingThermalPrintConfig(html){return {copies:1,color:false,size:{widt
 function parkingHtmlPrintData(kind,html){
  const data={type:'pixel',format:'html',flavor:'plain',data:html};
  if(kind==='ticket'&&parkingRotationEntryPageHeight(html))data.options={pageWidth:80,pageHeight:parkingRotationEntryPageHeight(html)};
+ if(kind==='staylist')data.options={pageWidth:210,pageHeight:297};
  if(kind==='stay')data.options={pageWidth:100,pageHeight:210};
  if(kind==='cashbook')data.options={pageWidth:285,pageHeight:198};
  if(kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')data.options={pageWidth:285,pageHeight:198};
@@ -50,3 +51,6 @@ function parkingCenteredMonthlyReceiptHtml(html){
  const style=doc.createElement('style');style.textContent='@page{size:A4 portrait;margin:0}html,body{width:210mm!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}.subscriberInvoiceDocument{width:210mm!important;height:297mm!important;max-height:297mm!important}.monthly-receipt-copies{box-sizing:border-box!important;width:180mm!important;max-width:180mm!important;height:297mm!important;margin:0 auto!important;padding:0 4mm!important;position:relative!important;display:grid!important;grid-template-rows:repeat(2,minmax(0,1fr))!important;align-items:center!important;gap:0!important;break-inside:avoid!important}.monthly-receipt-copies>.receipt{flex:0 0 auto!important;width:100%!important;min-height:100mm!important;margin:0!important}.monthly-receipt-copies>.receipt{align-self:center!important}.monthly-receipt-copies>.monthly-receipt-cut{position:absolute!important;top:148.5mm!important;left:4mm!important;width:calc(100% - 8mm)!important;height:0!important;margin:0!important;flex:none!important}';
  doc.head.appendChild(style);return '<!doctype html>'+doc.documentElement.outerHTML;
 }
+
+// A dedicated physical page contract prevents QZ from fitting the whole list on one sheet.
+function parkingStayListPrintConfig(){return {copies:1,color:false,units:'mm',orientation:'portrait',size:{width:210,height:297},margins:0,scaleContent:true,rasterize:true,jobName:'LISTADO ESTANCIAS · A4 VERTICAL'};}

@@ -1,4 +1,10 @@
-const PARKING_PRINTERS={invoice:'FACTURAS',stay:'RICOH MP 2003',cashbook:'HOJA DE CAJA',withdrawal:'HOJA DE CAJA',cashvale:'HOJA DE CAJA',cashexpense:'HOJA DE CAJA',ticket:'BIXOLON SRP-350III'};
+function parkingStayListPrintPages(html){
+ const doc=new DOMParser().parseFromString(html,'text/html'),pages=[...doc.querySelectorAll('.printPage')];
+ if(!pages.length)throw Error('No se encontraron páginas del listado de estancias.');
+ doc.querySelectorAll('script').forEach(s=>s.remove());
+ return pages.map(page=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+page.outerHTML+'</body></html>');
+}
+const PARKING_PRINTERS={invoice:'FACTURAS',staylist:'FACTURAS',stay:'RICOH MP 2003',cashbook:'HOJA DE CAJA',withdrawal:'HOJA DE CAJA',cashvale:'HOJA DE CAJA',cashexpense:'HOJA DE CAJA',ticket:'BIXOLON SRP-350III'};
 const PARKING_QZ_IDENTITY_DB='parking-qz-identity-v1';
 let parkingQzIdentity=null,parkingQzSigningLoaded=false;
 function parkingQzIdentityStore(mode,identity){return new Promise((resolve,reject)=>{const request=indexedDB.open(PARKING_QZ_IDENTITY_DB,1);request.onupgradeneeded=()=>request.result.createObjectStore('identity');request.onerror=()=>reject(new Error('Chrome no permite guardar la autorización local de QZ.'));request.onsuccess=()=>{const database=request.result;const tx=database.transaction('identity',mode);const store=tx.objectStore('identity');let result=null;const op=mode==='readwrite'?store.put(identity,'current'):store.get('current');op.onsuccess=()=>{result=op.result};tx.oncomplete=()=>{database.close();resolve(mode==='readwrite'?identity:result||null)};tx.onabort=()=>{database.close();reject(new Error('No se pudo guardar o leer la autorización local de QZ.'))}}})}
@@ -45,8 +51,9 @@ async function sendParkingPrint(kind,html,officeOnly=false){
  try{
   const hotelHtml=kind==='stay'&&html.includes('Bonos hotel ');
   const jobHtml=hotelHtml?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;margin:0!important;padding:0!important}.coupon{width:100mm!important;height:210mm!important;break-after:page!important}.coupon:last-child{break-after:auto!important}</style></head>'):kind==='stay'?html.replace('</head>','<style media="print">@page{size:100mm 210mm!important;margin:0!important}html,body{width:100mm!important;height:210mm!important;margin:0!important;overflow:hidden!important}.ticket{margin:0 auto!important}.actions{display:none!important}</style></head>'):html;
-  const cfg=monthlyReceipt?parkingMonthlyReceiptPrintConfig():kind==='ticket'?parkingThermalPrintConfig(html):kind==='stay'?parkingStayPrintConfig():(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')?await parkingCashbookPrintConfigForPrinter(target,kind):{copies:1,color:false};
-  if(hotelHtml){const pages=hotelCouponPrintPages(jobHtml);let sent=0;try{for(const pageHtml of pages){parkingQzStage='Enviando bono de hotel '+(sent+1)+' de '+pages.length+' a '+target;await qz.print(qz.configs.create(target,parkingStayPrintConfig()),[parkingHtmlPrintData('stay',pageHtml)]);sent++}}catch(e){throw new Error('Se han enviado '+sent+' de '+pages.length+' bonos a la cola. No repitas la tanda completa para evitar duplicados. Detalle: '+(e.message||e))}}
+  const cfg=kind==='staylist'?parkingStayListPrintConfig():monthlyReceipt?parkingMonthlyReceiptPrintConfig():kind==='ticket'?parkingThermalPrintConfig(html):kind==='stay'?parkingStayPrintConfig():(kind==='cashbook'||kind==='withdrawal'||kind==='cashvale'||kind==='cashexpense')?await parkingCashbookPrintConfigForPrinter(target,kind):{copies:1,color:false};
+  if(kind==='staylist'){const pages=parkingStayListPrintPages(jobHtml);let sent=0;try{for(const page of pages){await qz.print(qz.configs.create(target,parkingStayListPrintConfig()),[parkingHtmlPrintData(kind,page)]);sent++;}}catch(e){throw Error('Enviadas '+sent+' de '+pages.length+' páginas del listado. Revisa la cola antes de repetir. '+e.message);}}
+  else if(hotelHtml){const pages=hotelCouponPrintPages(jobHtml);let sent=0;try{for(const pageHtml of pages){parkingQzStage='Enviando bono de hotel '+(sent+1)+' de '+pages.length+' a '+target;await qz.print(qz.configs.create(target,parkingStayPrintConfig()),[parkingHtmlPrintData('stay',pageHtml)]);sent++}}catch(e){throw new Error('Se han enviado '+sent+' de '+pages.length+' bonos a la cola. No repitas la tanda completa para evitar duplicados. Detalle: '+(e.message||e))}}
   else {const data=parkingHtmlPrintData(kind,jobHtml);if(monthlyReceipt)data.options={pageWidth:210,pageHeight:297};await qz.print(qz.configs.create(target,cfg),[data])}
  }
  catch(e){throw new Error('QZ conecta y encuentra '+target+', pero falla el envío: '+(e.message||e))}
