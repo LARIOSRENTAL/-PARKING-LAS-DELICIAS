@@ -41,13 +41,13 @@ window.addEventListener('keydown',event=>{
  const now=performance.now();
  if(event.key==='Enter'||event.key==='Tab'){
   const scan=conversionScan;conversionScan=null;
-  const valid=scan&&scan.text.length>=3&&now-scan.last<100&&scan.last-scan.started<=Math.max(120,scan.text.length*45)&&(method==='hotel_voucher'?/^H-?[1-9][0-9]*$/i.test(scan.text):/^[A-Z0-9][A-Z0-9-]*$/i.test(scan.text));
+  const valid=scan&&scan.text.length>=3&&now-scan.last<100&&scan.last-scan.started<=Math.max(120,scan.text.length*45)&&(method==='hotel_voucher'?/^H-?[1-9][0-9]*$/i.test(normalizeHotelVoucherScan(scan.text)):/^[A-Z0-9][A-Z0-9-]*$/i.test(normalizeHotelVoucherScan(scan.text)));
   if(!valid)return;
   event.preventDefault();event.stopImmediatePropagation();
   const field=opsEl(method==='hotel_voucher'?'convertVoucherCodes':'convertOldCodes');
   const target=scan.target;
   if(target&&typeof target.value==='string'&&scan.start!==null){const expected=scan.before.slice(0,scan.start)+scan.text+scan.before.slice(scan.end);if(target.value.toUpperCase()===expected.toUpperCase())target.value=scan.before;}
-  let code=scan.text.toUpperCase();if(method==='hotel_voucher')code=parseHotelVoucherCodes(code)[0];
+  let code=normalizeHotelVoucherScan(scan.text);if(method==='hotel_voucher')code=parseHotelVoucherCodes(code)[0];
   let existing=[];try{existing=conversionCodes();}catch(e){}
   if(!existing.includes(code))field.value=field.value.trim()+(field.value.trim()?'\n':'')+code;
   field.focus();field.setSelectionRange(field.value.length,field.value.length);

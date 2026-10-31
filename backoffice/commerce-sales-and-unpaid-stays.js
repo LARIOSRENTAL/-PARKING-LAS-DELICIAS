@@ -80,7 +80,7 @@ async function confirmCombinedStayPayment(){
  const ctx=window.stayPaymentCurrent;if(!ctx||!ctx.quoteReady)return;
  const button=opsEl('stayCollectConfirm');if(button.disabled)return;button.disabled=true;let saved=false;
  try{
- const days=Number(opsEl('stayCollectDays').value),method=opsEl('stayCollectMethod').value,codes=[...document.querySelectorAll('.stayVoucherNumber')].map(x=>x.value.trim().toUpperCase());
+ const days=Number(opsEl('stayCollectDays').value),method=opsEl('stayCollectMethod').value,codes=[...document.querySelectorAll('.stayVoucherNumber')].map(x=>method==='hotel_voucher'?parseHotelVoucherCodes(x.value)[0]:x.value.trim().toUpperCase());
  if(!Number.isInteger(days)||days<1||days>24)throw Error('Introduce una duración válida.');
  if(method.startsWith('hotel_voucher')&&(codes.length!==days||codes.some(x=>!x)||new Set(codes).size!==days))throw Error('Se necesita un número de bono distinto para cada día.');
  const result=await db.rpc('parking_pay_enter_stay_documents',{p_reservation_id:ctx.id,p_spot_id:ctx.spot,p_exit_at:ctx.end,p_method:method,p_codes:codes,p_print_ticket:!method.startsWith('hotel_voucher')&&opsEl('stayCollectPrint').checked,p_invoice_customer:readStayCollectionInvoice()});
@@ -216,14 +216,14 @@ window.addEventListener('keydown',event=>{
  const now=performance.now();
  if(event.key==='Enter'||event.key==='Tab'){
   const scan=stayVoucherScan;stayVoucherScan=null;
-  const valid=scan&&scan.text.length>=3&&now-scan.last<100&&scan.last-scan.started<=Math.max(120,scan.text.length*45)&&/^[A-Z0-9][A-Z0-9-]*$/i.test(scan.text);
+  const valid=scan&&scan.text.length>=3&&now-scan.last<100&&scan.last-scan.started<=Math.max(120,scan.text.length*45)&&/^[A-Z0-9][A-Z0-9-]*$/i.test(normalizeHotelVoucherScan(scan.text));
   if(!valid){if(fields.includes(event.target)&&event.key==='Enter'){event.preventDefault();event.stopImmediatePropagation();fields[fields.indexOf(event.target)+1]?.focus();}return;}
   event.preventDefault();event.stopImmediatePropagation();
   const target=scan.target;
   if(target&&typeof target.value==='string'&&scan.start!==null){const expected=scan.before.slice(0,scan.start)+scan.text+scan.before.slice(scan.end);if(target.value.toUpperCase()===expected.toUpperCase())target.value=scan.before;}
   const field=fields.includes(target)?target:fields.find(f=>!f.value.trim());
   if(!field)return;
-  field.value=scan.text.toUpperCase();field.dispatchEvent(new Event('input',{bubbles:true}));
+  field.value=normalizeHotelVoucherScan(scan.text);field.dispatchEvent(new Event('input',{bubbles:true}));
   (fields[fields.indexOf(field)+1]||field).focus();return;
  }
  if(event.key.length!==1){stayVoucherScan=null;return;}
