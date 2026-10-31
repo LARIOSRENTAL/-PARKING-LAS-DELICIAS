@@ -23,7 +23,7 @@ let hotelInvoiceOpenSerial=0;
 async function openHotelBatchPayment(id){
  const request=++hotelInvoiceOpenSerial;
  const b=hotelPaymentBatches.find(x=>x.id===id);if(!b)return;
- const due=b.payment_status==='pending',hotel=parkingHotels.find(h=>h.id===b.hotel_id),canInvoice=['admin','manager'].includes(currentProfile?.role),requiresInvoice=Number(b.days)*Number(b.unit_price_eur)>3000;
+ const due=b.payment_status==='pending',hotel=parkingHotels.find(h=>h.id===b.hotel_id),canInvoice=['admin','manager','employee'].includes(currentProfile?.role),requiresInvoice=Number(b.days)*Number(b.unit_price_eur)>3000;
  if(requiresInvoice&&!canInvoice)return alert('Este importe requiere factura completa. Debe gestionarlo un administrador o gerente.');
  let fiscal=null,fiscalError='';
  if(canInvoice){try{const r=await db.rpc('parking_hotel_invoice_customer',{p_hotel_id:b.hotel_id});if(r.error)throw r.error;fiscal=r.data;}catch(e){fiscalError='No se pudieron cargar los datos fiscales guardados: '+e.message;}}
