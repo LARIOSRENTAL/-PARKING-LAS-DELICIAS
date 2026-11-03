@@ -54,3 +54,43 @@
   }
  };
 })();
+
+/* Backoffice visual and report fixes 2026-11-03. */
+(function(){
+ const style=document.createElement('style');
+ style.textContent='#totalStaySearch{border:3px solid #cf2828!important;background:#fff2f2!important;font-weight:850!important;font-size:17px!important}label[for="totalStaySearch"]{color:#bc1717!important;font-weight:900!important;font-size:16px!important}#spots .spot strong{font-size:23px!important;font-weight:950!important}#spots .spot.free{background:#d5f4de!important;border:2px solid #31925d!important}#spots .spot.busy{background:#ffdddd!important;border:2px solid #c83c3c!important}#spots .spot.reservedOut{background:#ffe09a!important;border:2px solid #ac7000!important}';
+ document.head.appendChild(style);
+ const priorRows=totalStayDisplayRows;
+ totalStayDisplayRows=function(mode){
+  const q=String(document.getElementById('totalStaySearch')?.value||'').trim().toLocaleUpperCase('es');
+  const rows=priorRows(mode);
+  return q?rows.filter(r=>[r.plate,r.reference,r.spot,r.vehicle,r.customer].some(v=>String(v||'').toLocaleUpperCase('es').includes(q))):rows;
+ };
+ const priorSend=sendParkingPrint;
+ sendParkingPrint=async function(kind,html,...args){
+  if(kind==='staylist'&&typeof html==='string'){
+   html=html.replace(/\.inside td\{background:#fff2d3\}/g,'.inside td{background:#fff}');
+  }
+  return priorSend(kind,html,...args);
+ };
+ const priorTickets=rotationTickets;
+ rotationTickets=async function(...args){
+  await priorTickets(...args);
+  const container=document.getElementById('rotationMinAmount')?.closest('.grid3');
+  if(container&&!document.getElementById('rotationPlateSearch')){
+   const field=document.createElement('div');field.className='field';
+   field.innerHTML='<label for="rotationPlateSearch">Buscar por matrícula</label><input id="rotationPlateSearch" type="search" placeholder="Matrícula completa o parcial">';
+   container.prepend(field);
+  }
+ };
+ const priorLoad=loadRotationReport;
+ loadRotationReport=async function(...args){
+  await priorLoad(...args);
+  const q=String(document.getElementById('rotationPlateSearch')?.value||'').trim().toUpperCase();
+  if(!q)return;
+  rotationReportRows=rotationReportRows.filter(r=>String(r.plate||'').toUpperCase().includes(q));
+  const el=document.getElementById('rotationReportResults');if(!el)return;
+  const privileged=['admin','manager'].includes(currentProfile?.role),rows=rotationReportRows;
+  el.innerHTML='<p>'+rows.length+' tickets · Total cobrado '+money(rows.filter(x=>x.exit_at).reduce((a,x)=>a+Number(x.amount_eur||0),0))+'</p><div class="tableWrap"><table class="tbl"><thead><tr><th>Ticket</th><th>Matrícula</th><th>Tarifa</th><th>Entrada</th><th>Salida</th><th>Importe</th><th>Pago</th><th>Documentos</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>#'+x.ticket_number+'</td><td>'+esc(x.plate)+'</td><td>'+esc(x.rotation_tariffs?.name||'')+'</td><td>'+fmt(x.entry_at)+'</td><td>'+(x.exit_at?fmt(x.exit_at):'DENTRO')+'</td><td>'+(x.exit_at?money(x.amount_eur||0):'—')+'</td><td>'+esc(Number(x.amount_eur)===0?'':paymentMethodLabel(x.payment_method))+'</td><td>'+rotationReportActions(x,privileged)+'</td></tr>').join('')+'</tbody></table></div>';
+ };
+})();
