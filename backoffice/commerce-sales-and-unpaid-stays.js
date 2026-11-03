@@ -254,9 +254,10 @@ window.addEventListener('keydown',event=>{
   const method=opsEl('stayCollectMethod')?.value||'';
   const key=[ctx.entry,ctx.type,opsEl('stayCollectDays')?.value].join('|');
   const changed=ctx._priceQuoteKey!==key;ctx._priceQuoteKey=key;
-  const field=opsEl('stayCollectManualAmount'),previous=field?.value;
+  const previous=opsEl('stayCollectManualAmount')?.value;
   const result=await originalUpdate(fromDays);
   if(ctx!==window.stayPaymentCurrent)return result;
+  const field=opsEl('stayCollectManualAmount');
   const voucher=method.startsWith('hotel_voucher'),wrap=opsEl('stayCollectPriceAdjustment');
   if(wrap)wrap.classList.toggle('hidden',voucher);
   if(!voucher&&ctx.quoteReady&&field&&Number.isFinite(ctx.standardAmount)){
