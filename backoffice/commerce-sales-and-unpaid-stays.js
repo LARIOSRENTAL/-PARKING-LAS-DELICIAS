@@ -72,7 +72,7 @@ async function updateCombinedStayPayment(fromDays=false){
  const wrapper=opsEl('stayCollectVouchers'),previous=[...wrapper.querySelectorAll('input')].map(x=>x.value);
  wrapper.innerHTML=voucher?Array.from({length:days},(_,i)=>'<div class="field"><label>Bono hotel día '+(i+1)+'</label><input class="stayVoucherNumber" placeholder="'+(method==='hotel_voucher'?'Escanear bono':'Número del bono antiguo')+'" value="'+esc(previous[i]||'')+'"></div>').join(''):'';
  if(voucher){opsEl('stayCollectPrice').textContent='';ctx.quoteReady=true;opsEl('stayCollectConfirm').disabled=false;return}
- try{const quote=await db.rpc('parking_stay_price',{p_vehicle_type_id:ctx.type,p_days:days,p_entry_at:ctx.entry});if(ctx!==window.stayPaymentCurrent||serial!==ctx.quoteSerial)return;if(quote.error)throw quote.error;if(quote.data===null)throw Error('No existe tarifa para esa duración.');opsEl('stayCollectPrice').textContent=money(quote.data);ctx.quoteReady=true;opsEl('stayCollectConfirm').disabled=false}catch(e){if(serial===ctx.quoteSerial)opsEl('parkingOpsMessage').textContent='No se pudo calcular el precio: '+e.message}
+ try{const quote=await db.rpc('parking_stay_price',{p_vehicle_type_id:ctx.type,p_days:days,p_entry_at:ctx.entry});if(ctx!==window.stayPaymentCurrent||serial!==ctx.quoteSerial)return;if(quote.error)throw quote.error;if(quote.data===null)throw Error('No existe tarifa para esa duración.');opsEl('stayCollectPrice').textContent=money(quote.data);ctx.standardAmount=Number(quote.data);ctx.quoteReady=true;opsEl('stayCollectConfirm').disabled=false}catch(e){if(serial===ctx.quoteSerial)opsEl('parkingOpsMessage').textContent='No se pudo calcular el precio: '+e.message}
 }
 function stayCollectionInvoiceChanged(){opsEl('stayCollectInvoiceFields').classList.toggle('hidden',!opsEl('stayCollectInvoice').checked)}
 function readStayCollectionInvoice(){if(!opsEl('stayCollectInvoice').checked)return null;const name=opsEl('stayInvoiceName').value.trim(),tax_id=opsEl('stayInvoiceTax').value.trim(),address=opsEl('stayInvoiceAddress').value.trim();if(!name||!tax_id||!address)throw Error('Completa nombre, NIF/CIF y domicilio para generar la factura.');return{name,tax_id,address}}
@@ -83,13 +83,17 @@ async function confirmCombinedStayPayment(){
  const days=Number(opsEl('stayCollectDays').value),method=opsEl('stayCollectMethod').value,codes=[...document.querySelectorAll('.stayVoucherNumber')].map(x=>method==='hotel_voucher'?parseHotelVoucherCodes(x.value)[0]:x.value.trim().toUpperCase());
  if(!Number.isInteger(days)||days<1||days>24)throw Error('Introduce una duración válida.');
  if(method.startsWith('hotel_voucher')&&(codes.length!==days||codes.some(x=>!x)||new Set(codes).size!==days))throw Error('Se necesita un número de bono distinto para cada día.');
- const result=await db.rpc('parking_pay_enter_stay_documents',{p_reservation_id:ctx.id,p_spot_id:ctx.spot,p_exit_at:ctx.end,p_method:method,p_codes:codes,p_print_ticket:!method.startsWith('hotel_voucher')&&opsEl('stayCollectPrint').checked,p_invoice_customer:readStayCollectionInvoice()});
+ const standard=Number(ctx.standardAmount),manual=Number(opsEl('stayCollectManualAmount')?.value),reason=String(opsEl('stayCollectAdjustmentReason')?.value||'').trim();
+ if(!method.startsWith('hotel_voucher')&&(!Number.isFinite(standard)||!Number.isFinite(manual)||manual<0||manual>999999))throw Error('Revisa el precio de la estancia.');
+ const adjusted=!method.startsWith('hotel_voucher')&&Math.round(manual*100)!==Math.round(standard*100);
+ if(adjusted&&reason.length<3)throw Error('Es obligatorio escribir el motivo del cambio de precio (mínimo 3 caracteres).');
+ const result=await db.rpc('parking_pay_enter_stay_documents_adjusted',{p_reservation_id:ctx.id,p_spot_id:ctx.spot,p_exit_at:ctx.end,p_method:method,p_amount_override:adjusted?manual:null,p_adjustment_reason:adjusted?reason:null,p_codes:codes,p_print_ticket:!method.startsWith('hotel_voucher')&&opsEl('stayCollectPrint').checked,p_invoice_customer:readStayCollectionInvoice()});
  if(result.error)throw result.error;saved=true;
  closeParkingOpsModal();await refreshAll();
  if(result.data.invoice)showParkingInvoicePreview(result.data.invoice);
  if(result.data.receipt)try{await printParkingThermal(buildSimplifiedTicket(result.data.receipt))}catch(e){alert('Entrada guardada; error al imprimir el ticket de cobro: '+e.message)}
  const res=reservations.find(x=>x.id===ctx.id);
- if(res)try{const ps=insideSessions.find(x=>x.reservation_id===ctx.id),sp=spots.find(x=>x.id===ctx.spot);await sendParkingPrint('stay',buildVoucherHtml(res,sp?.code||'',ps?.actual_entry_at||new Date().toISOString(),null))}catch(e){alert('Entrada y cobro guardados; error al imprimir el bono: '+e.message)}
+ if(res)try{const ps=insideSessions.find(x=>x.reservation_id===ctx.id),sp=spots.find(x=>x.id===ctx.spot);await printEntryVoucher(null,res,sp?.code||'',ps?.actual_entry_at||new Date().toISOString(),null)}catch(e){alert('Entrada y cobro guardados; error al imprimir el bono: '+e.message)}
  }catch(e){if(saved)alert('Cobro y entrada guardados. No repitas el cobro. '+e.message);else opsEl('parkingOpsMessage').textContent=e.message}finally{button.disabled=false}
 }
 
@@ -231,3 +235,40 @@ window.addEventListener('keydown',event=>{
  if(!stayVoucherScan||now-stayVoucherScan.last>80||stayVoucherScan.target!==target)stayVoucherScan={text:'',target,before:typeof target.value==='string'?target.value:'',start:target.selectionStart??null,end:target.selectionEnd??null,started:now,last:now};
  stayVoucherScan.text+=event.key;stayVoucherScan.last=now;
 },true);
+
+/* Display editable price in combined stay collection; enforcement remains in Supabase. */
+(function(){
+ const originalOpen=openStayCollection,originalUpdate=updateCombinedStayPayment;
+ openStayCollection=function(id){
+  const result=originalOpen(id);
+  const price=opsEl('stayCollectPrice');
+  if(price&&!opsEl('stayCollectManualAmount')){
+   const fields=document.createElement('div');fields.id='stayCollectPriceAdjustment';
+   fields.innerHTML='<div class="field"><label for="stayCollectManualAmount">Precio de la estancia (€) · editable</label><input id="stayCollectManualAmount" type="number" min="0" max="999999" step="0.01" placeholder="Importe a cobrar"></div><div class="field"><label for="stayCollectAdjustmentReason">Motivo del cambio de precio (obligatorio si se modifica)</label><textarea id="stayCollectAdjustmentReason" rows="2" maxlength="500" placeholder="Indica por qué se modifica la tarifa"></textarea></div>';
+   price.insertAdjacentElement('afterend',fields);
+  }
+  return result;
+ };
+ updateCombinedStayPayment=async function(fromDays=false){
+  const ctx=window.stayPaymentCurrent;if(!ctx)return;
+  const method=opsEl('stayCollectMethod')?.value||'';
+  const key=[ctx.entry,ctx.type,opsEl('stayCollectDays')?.value].join('|');
+  const changed=ctx._priceQuoteKey!==key;ctx._priceQuoteKey=key;
+  const field=opsEl('stayCollectManualAmount'),previous=field?.value;
+  const result=await originalUpdate(fromDays);
+  if(ctx!==window.stayPaymentCurrent)return result;
+  const voucher=method.startsWith('hotel_voucher'),wrap=opsEl('stayCollectPriceAdjustment');
+  if(wrap)wrap.classList.toggle('hidden',voucher);
+  if(!voucher&&ctx.quoteReady&&field&&Number.isFinite(ctx.standardAmount)){
+   if(changed||!previous||ctx._priceEdited!==true){
+    field.value=ctx.standardAmount.toFixed(2);
+    ctx._priceEdited=false;
+   }
+   if(!field.dataset.adjustmentListener){
+    field.addEventListener('input',()=>{ctx._priceEdited=true});
+    field.dataset.adjustmentListener='true';
+   }
+  }
+  return result;
+ };
+})();
