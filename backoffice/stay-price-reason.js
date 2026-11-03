@@ -1,0 +1,1 @@
+/* Reason field for stay price overrides. */
