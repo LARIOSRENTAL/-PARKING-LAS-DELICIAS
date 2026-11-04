@@ -24,6 +24,7 @@ assert(!printRows.includes('Saldo de entrada'));
 for(const label of ['Monedas sueltas','Monedas empaquetadas','Billetes','Vales pendientes','Saldo contado a la salida','Diferencia de arqueo'])assert(!printRows.includes(label),label);
 assert.match(printRows,/<tr class="grand"><th[^>]*>Saldo calculado a la salida<\/th>[\s\S]*?1350.00 €<\/td><\/tr>$/);
 assert(printRows.includes('RECIBOS P'));assert.equal((printRows.match(/<tr/g)||[]).length,12);
+for(const row of printRows.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g))assert.equal((row[1].match(/<(?:th|td)[ >]/g)||[]).length,2);assert(!printRows.includes('class="sign"'));assert(printRows.includes('white-space:nowrap'));
 // Daily output uses the exact same physical page, centering and CSS as shift close.
 const shift=ctx.buildCashbookHtml({...reports[0],date:'2026-11-03'});
 assert.equal(printed.match(/<style>([\s\S]*?)<\/style>/)[1],shift.match(/<style>([\s\S]*?)<\/style>/)[1]);

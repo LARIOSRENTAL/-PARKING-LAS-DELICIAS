@@ -46,8 +46,8 @@ function buildDailyCashbookHtml(data){
  const date=esc(data.date.split('-').reverse().join('/'));
  const header='<header><p style="text-align:center;margin:0"><img src="'+parkingOpsLogo+'" alt="Logo original Las Delicias"></p><h2>Caja diaria</h2><p>'+date+' · Día completo</p><p>Desde las 22:00 del día anterior hasta las 22:00</p></header>';
  const end=DAILY_CASH_LINES.findIndex(([,key])=>key==='expected');
- let summary='<table class="summary ledger" width="100%"><thead><tr><th colspan="2" style="width:73%">Concepto</th><th style="width:27%;text-align:right">DÍA COMPLETO</th></tr></thead><tbody>';
- for(const [label,key]of DAILY_CASH_LINES.slice(1,end+1))summary+='<tr'+(['total','expected'].includes(key)?' class="grand"':'')+'><th width="69%" align="left">'+esc(label)+'</th><td class="sign" width="4%"></td><td class="amount" width="27%" align="right">'+(data.measures&&data.measures[key]!==null?money(data.measures[key]):'—')+'</td></tr>';
+ let summary='<table class="summary ledger" width="100%"><colgroup><col style="width:75%"><col style="width:25%"></colgroup><thead><tr><th style="width:75%;white-space:nowrap;overflow-wrap:normal">Concepto</th><th style="width:25%;text-align:right;white-space:nowrap">DÍA COMPLETO</th></tr></thead><tbody>';
+ for(const [label,key]of DAILY_CASH_LINES.slice(1,end+1))summary+='<tr'+(['total','expected'].includes(key)?' class="grand"':'')+'><th width="75%" style="width:75%;white-space:nowrap;overflow-wrap:normal" align="left">'+esc(label)+'</th><td class="amount" width="25%" style="width:25%" align="right">'+(data.measures&&data.measures[key]!==null?money(data.measures[key]):'—')+'</td></tr>';
  summary+='</tbody></table>';
  if(data.warnings.length)summary+='<p class="difference">Resumen provisional. '+data.warnings.map(esc).join(' ')+'</p>';
  return buildCashbookHtml({date:data.date,generated_at:data.generated_at},{headerHtml:header,summaryHtml:summary,hideFolio:true,hideSignatures:true});
