@@ -57,18 +57,19 @@ async function updateManualPrice(){
 function availableInventorySpot(s){return !s.inventory_state||s.inventory_state==='available'}
 function freeSpotsFor(typeId){const used=new Set([...insideSessions,...rotationSpotSessions].map(s=>s.spot_id).filter(Boolean)),reserved=reservedOutsideSpotIds();return spots.filter(s=>availableInventorySpot(s)&&spotFitsVehicle(s,typeId)&&!used.has(s.id)&&!reserved.has(s.id)&&!activeBlockForSpot(s.id))}
 async function loadSpots(){
- const [rotationRows,inventory,fixed]=await Promise.all([db.from('rotation_sessions').select('id,spot_id,plate,entry_at').eq('status','inside').eq('billing_only',false),db.from('parking_spots').select('id,code,vehicle_type_id,sort_order,active,zone,spot_class,inventory_state,polyvalent').eq('active',true).order('sort_order'),db.rpc('parking_fixed_assignments')]);
- if(inventory.error||fixed.error){document.getElementById('spotsBody').textContent='No se pudo actualizar el planning: '+(inventory.error||fixed.error).message;return}
+ const [rotationRows,inventory,fixed,stayRows]=await Promise.all([db.from('rotation_sessions').select('id,spot_id,plate,entry_at').eq('status','inside').eq('billing_only',false),db.from('parking_spots').select('id,code,vehicle_type_id,sort_order,active,zone,spot_class,inventory_state,polyvalent').eq('active',true).order('sort_order'),db.rpc('parking_fixed_assignments'),db.from('parking_sessions').select('id,reservation_id,spot_id,plate,actual_entry_at,planned_entry_at,planned_exit_at').eq('status','inside')]);
+ if(inventory.error||fixed.error||stayRows.error){document.getElementById('spotsBody').textContent='No se pudo actualizar el planning: '+(inventory.error||fixed.error||stayRows.error).message;return}
  spots=inventory.data||[];const spotChoices=document.getElementById('subscriberSpotChoices');if(spotChoices)spotChoices.innerHTML=spots.filter(s=>s.inventory_state!=='legacy').map(s=>'<option value="'+esc(s.code)+'">'+esc(s.spot_class)+'</option>').join('');fixedSpotAssignments=fixed.data||[];parkingPlanDetails.clear();
  if(rotationRows.error){document.getElementById('spotsBody').textContent='No se pudo consultar la ocupación de Rotación: '+rotationRows.error.message;return}
  rotationUnassignedCount=(rotationRows.data||[]).filter(s=>!s.spot_id).length;
  rotationSpotSessions=(rotationRows.data||[]).filter(s=>s.spot_id).map(s=>({...s,actual_entry_at:s.entry_at}));
  await loadCapacityBlocks();
  const date=document.getElementById('spotPlanDate')?.value||localInput(new Date()).slice(0,10),start=new Date(date+'T00:00:00'),end=new Date(date+'T00:00:00');end.setDate(end.getDate()+1);
+ const isToday=date===localInput(new Date()).slice(0,10);
  const overlap=(a,b)=>new Date(a)<end&&new Date(b)>start;
  const stateFilter=document.getElementById('spotStateFilter')?.value||'',classFilter=document.getElementById('spotClassFilter')?.value||'';
- const live=reservations.filter(r=>!r.rotation_pending&&['confirmed','checked_in','pending_payment'].includes(r.status)&&(overlap(r.entry_at,r.exit_at)||(r.last_movement_at&&['confirmed','checked_in'].includes(r.status)&&new Date(r.entry_at)<end)));
- const used=new Map([...insideSessions,...rotationSpotSessions].filter(s=>s.spot_id).map(s=>[s.spot_id,s]));
+ const live=reservations.filter(r=>!r.rotation_pending&&['confirmed','checked_in','pending_payment'].includes(r.status)&&((isToday&&r.vehicle_presence==='DENTRO')||overlap(r.entry_at,r.exit_at)||(r.last_movement_at&&['confirmed','checked_in'].includes(r.status)&&new Date(r.entry_at)<end)));
+ const used=new Map([...(stayRows.data||[]),...rotationSpotSessions].filter(s=>s.spot_id).map(s=>[s.spot_id,s]));
  const zones=[...new Set(spots.map(s=>s.inventory_state==='legacy'?'PENDIENTES DE UBICAR':s.zone||'OTRAS'))].sort((a,b)=>(parkingZoneOrder.includes(a)?parkingZoneOrder.indexOf(a):99)-(parkingZoneOrder.includes(b)?parkingZoneOrder.indexOf(b):99));
  let html=(rotationUnassignedCount?'<div class="msg error">'+rotationUnassignedCount+' tickets anteriores de Rotación sin plaza asignada. Revisa Ocupación de Rotación y asigna su plaza desde Actualizar datos.</div>':'')+'<div class="planLegend"><span class="free">Libre</span><span class="fixed">Fijo / abonado</span><span class="blocked">Ocupado / bloqueo</span><span class="busy">Dentro</span><span class="reservedOut">Fuera / reservada</span></div><div class="planHint">Pulsa una plaza para ver el titular, matrícula y acciones. A y M: sin llaves.</div>';
  const unresolved=fixedSpotAssignments.filter(x=>!x.spot_id);if(unresolved.length)html+='<details class="planHint"><summary>'+unresolved.length+' abonados pendientes de concretar plaza</summary>'+unresolved.map(x=>esc(x.customer_name)+' · '+esc(x.plate)+' · '+esc(x.label||'Sin plaza')).join('<br>')+'</details>';
@@ -77,7 +78,7 @@ async function loadSpots(){
  const assigned=live.filter(r=>r.assigned_spot_id===s.id),u=used.get(s.id),b=capacityBlocks.find(b=>b.spot_id===s.id&&overlap(b.starts_at,b.ends_at));
  let state=s.inventory_state==='fixed'?'FIJO':s.inventory_state==='blocked'?'OCUPADO':b?'BLOQUEADA':assigned.length?'RESERVADA':s.inventory_state==='legacy'?'PENDIENTE DE UBICAR':'LIBRE';
  if(assigned.some(r=>r.last_movement_at))state=assigned.some(r=>r.vehicle_presence==='DENTRO')?'DENTRO':'FUERA';
- if(u&&new Date(u.actual_entry_at||u.planned_entry_at)<end)state='DENTRO';
+ if(u&&(isToday||new Date(u.actual_entry_at||u.planned_entry_at)<end))state='DENTRO';
  if(stateFilter&&stateFilter!==state)continue;if(classFilter&&s.spot_class!==classFilter)continue;
  const cls=state==='LIBRE'?'free':state==='FIJO'?'fixed':['OCUPADO','BLOQUEADA'].includes(state)?'blocked':state==='DENTRO'?'busy':'reservedOut';
  const holders=fixedSpotAssignments.filter(x=>x.spot_id===s.id);
