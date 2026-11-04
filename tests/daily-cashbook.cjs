@@ -15,6 +15,15 @@ assert.equal((await ctx.fetchDailyCashbook('2026-11-03')).reports.length,3);asse
 ctx.currentProfile.role='employee';await assert.rejects(()=>ctx.fetchDailyCashbook('2026-11-03'),/Solo gerente/);assert.equal(calls,6);ctx.currentProfile.role='manager';
 let sent=0;ctx.sendParkingPrint=async(kind,html)=>{sent++;assert.equal(kind,'cashbook');assert(html.includes('DÍA COMPLETO'));assert(html.includes('RECIBOS P'))};await ctx.printDailyCashbook();assert.equal(sent,1);
 ctx.db.rpc=async()=>({error:{message:'offline'}});await ctx.loadDailyCashbook();assert.equal(node('dailyCashbookPrint').disabled,true);assert.equal(node('dailyCashbookBody').innerHTML,'');assert(node('dailyCashbookMessage').textContent.includes('offline'));await ctx.printDailyCashbook();assert.equal(sent,1);
-fs.writeFileSync('/tmp/parking-daily-cashbook.html',ctx.buildDailyCashbookHtml(daily));
+const screen=ctx.renderDailyCashbook(daily),printed=ctx.buildDailyCashbookHtml(daily);
+assert(screen.includes('<th>T1'));assert(screen.includes('<th>T2'));assert(screen.includes('<th>T3'));assert(screen.includes('Saldo de entrada'));assert(screen.includes('Diferencia de arqueo'));
+const printHead=printed.match(/<thead>([\s\S]*?)<\/thead>/)[1],printRows=[...printed.matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)][0][1];
+assert.equal((printHead.match(/<th>/g)||[]).length,2);assert(printHead.includes('Concepto'));assert(printHead.includes('DÍA COMPLETO'));
+assert(!printHead.includes('<th>T1'));assert(!printHead.includes('<th>T2'));assert(!printHead.includes('<th>T3'));
+assert(!printRows.includes('Saldo de entrada'));
+for(const label of ['Monedas sueltas','Monedas empaquetadas','Billetes','Vales pendientes','Saldo contado a la salida','Diferencia de arqueo'])assert(!printRows.includes(label),label);
+assert(printRows.endsWith('<tr class="dailyTotal"><th>Saldo calculado a la salida</th><td>1350.00 €</td></tr>'));
+assert(printRows.includes('RECIBOS P'));assert.equal((printRows.match(/<tr/g)||[]).length,12);
+fs.writeFileSync('/tmp/parking-daily-cashbook.html',printed);
 console.log('Daily cashbook: 3 shifts, P receipts, no duplicate handover balances/vouchers, provisional/missing shifts, manager access, fresh print and network failures verified.');
 })().catch(e=>{console.error(e);process.exitCode=1});
