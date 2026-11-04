@@ -38,15 +38,21 @@ reEl('spot').addEventListener('blur',()=>completeReinforcementZone());
 reEl('spot').addEventListener('keydown',event=>{
   if(event.key==='Enter'){event.preventDefault();completeReinforcementZone();rotationEntry();}
 });
+let reinforcementSpotSerial=0;
 async function reloadReinforcementSpots(){
   if(!reinforcementCode)return;
-  const options=await reCall('parking_reinforcement_options',{p_code:reinforcementCode});
+  const serial=++reinforcementSpotSerial,previous=reEl('spot').value;
+  const previouslyListed=(reinforcementData?.spots||[]).some(s=>reinforcementSpotCode(s.code)===reinforcementSpotCode(previous));
+  let options;try{options=await reCall('parking_reinforcement_options',{p_code:reinforcementCode});}catch(e){if(serial===reinforcementSpotSerial){reinforcementData={...reinforcementData,spots:[]};reEl('spotOptions').innerHTML='';}throw e;}
+  if(serial!==reinforcementSpotSerial)return;
   reinforcementData=options;
-  const previous=reEl('spot').value;
   const free=reinforcementFreeSpots();
   reEl('spotOptions').innerHTML=free.map(s=>'<option value="'+reEscape(s.code)+'"></option>').join('');
+  reEl('spot').setAttribute('list','spotOptions');
   const selected=free.find(s=>reinforcementSpotCode(s.code)===reinforcementSpotCode(previous));
-  reEl('spot').value=selected?selected.code:'';
+  if(selected)reEl('spot').value=selected.code;
+  else if(previouslyListed){reEl('spot').value='';reEl('spotHelp').textContent='La plaza '+previous+' ya no está disponible. Selecciona otra plaza libre.';}
+
 }
 function reEscape(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -244,18 +250,36 @@ async function reloadReinforcementStaySpots(){
 }
 reEl('type').addEventListener('change',renderReinforcementStaySpots);
 
-/* Synchronize occupancy while Refuerzo remains open on mobile devices. */
-let reinforcementAutoSyncBusy=false;
-async function reinforcementAutoSyncSpots(){
- if(!reinforcementCode||document.hidden||reinforcementAutoSyncBusy)return;
- if(reEl('enterButton').disabled||reEl('stayButton').disabled)return;
- reinforcementAutoSyncBusy=true;
- try{
-  await Promise.all([reloadReinforcementSpots(),reloadReinforcementStaySpots()]);
- }catch(e){
-  reEl('spotHelp').textContent='No se pudo actualizar la ocupación. Comprueba la conexión antes de asignar plaza.';
- }finally{reinforcementAutoSyncBusy=false}
+/* Refresh only while Refuerzo is visible; preflight remains mandatory before writes. */
+let reinforcementAvailabilityBusy=false;
+function reinforcementAvailabilityStatus(message){let status=reEl('reinforcementAvailabilityStatus');if(!status){status=document.createElement('p');status.id='reinforcementAvailabilityStatus';status.setAttribute('role','status');document.querySelector('#work .tabs').after(status)}status.textContent=message;}
+async function refreshReinforcementAvailability(){
+ if(!reinforcementCode||document.hidden||reinforcementAvailabilityBusy||reEl('enterButton').disabled||reEl('stayButton').disabled)return;
+ reinforcementAvailabilityBusy=true;
+ const oldStay=reEl('staySpot').value,wasListed=!!selectedReinforcementStaySpot();
+ try{await Promise.all([reloadReinforcementSpots(),reloadReinforcementStaySpots()]);
+  if(oldStay&&wasListed&&!reEl('staySpot').value)reEl('staySpotHelp').textContent='La plaza '+oldStay+' ya no está disponible. Selecciona otra plaza libre.';
+  reinforcementAvailabilityStatus('Plazas actualizadas · '+new Date().toLocaleTimeString('es-ES'));
+ }catch(e){reinforcementAvailabilityStatus('No se pudieron actualizar las plazas. Se comprobarán antes de registrar: '+e.message)}finally{reinforcementAvailabilityBusy=false}
 }
-setInterval(reinforcementAutoSyncSpots,8000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)reinforcementAutoSyncSpots()});
-window.addEventListener('focus',reinforcementAutoSyncSpots);
+setInterval(refreshReinforcementAvailability,3000);
+window.addEventListener('focus',refreshReinforcementAvailability);
+window.addEventListener('online',refreshReinforcementAvailability);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshReinforcementAvailability()});
+const rotationEntryBeforeAvailabilityCheck=rotationEntry;
+rotationEntry=async function(){
+ const button=reEl('enterButton');if(button.disabled)return;button.disabled=true;
+ const wanted=reEl('spot').value;
+ try{await reloadReinforcementSpots();
+  if(!wanted||!selectedReinforcementSpot()){reShowMessage('La plaza seleccionada ya no está disponible. Elige otra plaza libre antes de dar entrada.',true);return;}
+  button.disabled=false;await rotationEntryBeforeAvailabilityCheck();
+ }catch(e){reShowMessage('No se pudo comprobar la plaza. No se ha registrado la entrada: '+e.message,true)}finally{button.disabled=false}
+};
+const createStayBeforeAvailabilityCheck=createStay;
+createStay=async function(){
+ const button=reEl('stayButton');if(button.disabled)return;button.disabled=true;const wanted=reEl('staySpot').value.trim();
+ try{await reloadReinforcementStaySpots();
+  if(wanted&&!selectedReinforcementStaySpot()){reShowMessage('La plaza seleccionada ya no está disponible. Selecciona otra o deja el campo vacío.',true);return;}
+  button.disabled=false;await createStayBeforeAvailabilityCheck();
+ }catch(e){reShowMessage('No se pudo comprobar la disponibilidad. No se ha creado la estancia: '+e.message,true)}finally{button.disabled=false}
+};

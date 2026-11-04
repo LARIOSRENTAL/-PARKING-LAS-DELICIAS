@@ -5,7 +5,8 @@
     "test:daily-cashbook": "node daily-cashbook.cjs && node qz-setup.cjs && node qz-connection.cjs",
     "test:fin-hotel": "node fin-hotel-ui.cjs && node fin-hotel-db.cjs",
     "test:shift-summary": "node shift-cashbook-summary.cjs",
-    "test:checkout-context": "node rotation-checkout-context.cjs"
+    "test:checkout-context": "node rotation-checkout-context.cjs",
+    "test:reinforcement-availability": "node reinforcement-availability.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10"
