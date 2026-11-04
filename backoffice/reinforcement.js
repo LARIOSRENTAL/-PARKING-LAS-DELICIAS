@@ -243,3 +243,19 @@ async function reloadReinforcementStaySpots(){
  catch(e){if(serial===reinforcementStaySpotSerial){reinforcementStaySpots=[];renderReinforcementStaySpots();}throw e;}
 }
 reEl('type').addEventListener('change',renderReinforcementStaySpots);
+
+/* Synchronize occupancy while Refuerzo remains open on mobile devices. */
+let reinforcementAutoSyncBusy=false;
+async function reinforcementAutoSyncSpots(){
+ if(!reinforcementCode||document.hidden||reinforcementAutoSyncBusy)return;
+ if(reEl('enterButton').disabled||reEl('stayButton').disabled)return;
+ reinforcementAutoSyncBusy=true;
+ try{
+  await Promise.all([reloadReinforcementSpots(),reloadReinforcementStaySpots()]);
+ }catch(e){
+  reEl('spotHelp').textContent='No se pudo actualizar la ocupación. Comprueba la conexión antes de asignar plaza.';
+ }finally{reinforcementAutoSyncBusy=false}
+}
+setInterval(reinforcementAutoSyncSpots,8000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)reinforcementAutoSyncSpots()});
+window.addEventListener('focus',reinforcementAutoSyncSpots);
