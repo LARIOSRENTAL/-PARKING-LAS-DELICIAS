@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const root=path.join(__dirname,'..'),ops=fs.readFileSync(path.join(root,'backoffice/operations.js'),'utf8'),nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'2026-11-03',innerHTML:'',textContent:'',disabled:false});return nodes.get(id)};
-const ctx={console,Date,Number,Math,Set,Map,currentProfile:{role:'manager'},cashCountDirty:false,opsEl:node,esc:v=>String(v??'').replaceAll('<','&lt;'),money:v=>Number(v).toFixed(2)+' €',fmt:String};vm.createContext(ctx);vm.runInContext(ops.slice(ops.indexOf('function cashbookTotals('),ops.indexOf('async function attachCashbookSheetNumber(')),ctx);vm.runInContext(fs.readFileSync(path.join(root,'backoffice/daily-cashbook.js'),'utf8'),ctx);
+const ctx={console,Date,Number,Math,Set,Map,currentProfile:{role:'manager'},cashCountDirty:false,parkingOpsLogo:'logo.png',opsEl:node,esc:v=>String(v??'').replaceAll('<','&lt;'),money:v=>Number(v).toFixed(2)+' €',fmt:String};vm.createContext(ctx);vm.runInContext(ops.slice(ops.indexOf('function cashbookTotals('),ops.indexOf('async function attachCashbookSheetNumber(')),ctx);vm.runInContext(ops.split('\n').slice(0,2).join('\n')+'\n'+ops.slice(ops.indexOf('function buildCashbookHtml('),ops.indexOf('async function printCashbook(')),ctx);vm.runInContext(fs.readFileSync(path.join(root,'backoffice/daily-cashbook.js'),'utf8'),ctx);
 const row=(id,amount,category='rotation',method='cash',p=false)=>({id,amount_eur:amount,category,payment_method:method,subscriber_receipt_p:p});
 const reports=[{shift_id:'a',shift_code:1,date:'2026-11-03',opened_at:'2026-11-02T21:00Z',closed_at:'closed',cashbook_number:170,employee_name:'Uno',rows:[row('a',100),row('p',152,'subscriber','cash',true),row('f',80,'subscriber','bank')],withdrawal_total_eur:50,cash_state:{saved:true,opening_balance:1000,expense_total:2,counted_total:1200,loose_coins:20,wrapped_coins:30,banknotes:1100,vouchers:50}},{shift_id:'b',shift_code:2,date:'2026-11-03',opened_at:'2026-11-03T05:00Z',closed_at:'closed',employee_name:'Dos',rows:[row('b',200)],withdrawal_total_eur:100,cash_state:{saved:true,opening_balance:1200,expense_total:0,counted_total:1300,vouchers:50}},{shift_id:'c',shift_code:3,date:'2026-11-03',opened_at:'2026-11-03T13:00Z',closed_at:'closed',employee_name:'Tres',rows:[row('c',50,'stay'),row('d',35,'rotation','card')],withdrawal_total_eur:0,cash_state:{saved:true,opening_balance:1300,expense_total:0,counted_total:1350,vouchers:50}}];
 (async()=>{
@@ -16,14 +16,19 @@ ctx.currentProfile.role='employee';await assert.rejects(()=>ctx.fetchDailyCashbo
 let sent=0;ctx.sendParkingPrint=async(kind,html)=>{sent++;assert.equal(kind,'cashbook');assert(html.includes('DÍA COMPLETO'));assert(html.includes('RECIBOS P'))};await ctx.printDailyCashbook();assert.equal(sent,1);
 ctx.db.rpc=async()=>({error:{message:'offline'}});await ctx.loadDailyCashbook();assert.equal(node('dailyCashbookPrint').disabled,true);assert.equal(node('dailyCashbookBody').innerHTML,'');assert(node('dailyCashbookMessage').textContent.includes('offline'));await ctx.printDailyCashbook();assert.equal(sent,1);
 const screen=ctx.renderDailyCashbook(daily),printed=ctx.buildDailyCashbookHtml(daily);
-assert(screen.includes('<th>T1'));assert(screen.includes('<th>T2'));assert(screen.includes('<th>T3'));assert(screen.includes('Saldo de entrada'));assert(screen.includes('Diferencia de arqueo'));
-const printHead=printed.match(/<thead>([\s\S]*?)<\/thead>/)[1],printRows=[...printed.matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)][0][1];
-assert.equal((printHead.match(/<th>/g)||[]).length,2);assert(printHead.includes('Concepto'));assert(printHead.includes('DÍA COMPLETO'));
+assert(screen.includes('<th>T1'));assert(screen.includes('<th>T2'));assert(screen.includes('<th>T3'));assert(screen.includes('Saldo de entrada'));assert(!screen.includes('Diferencia de arqueo'));for(const label of ['Monedas sueltas','Monedas empaquetadas','Billetes','Vales pendientes','Saldo contado a la salida'])assert(!screen.includes('<th>'+label+'</th>'));assert(screen.includes('<th>Saldo calculado a la salida</th>'));
+const printTable=printed.match(/<table class="summary ledger"[^>]*>([\s\S]*?)<\/table>/)[1],printHead=printTable.match(/<thead>([\s\S]*?)<\/thead>/)[1],printRows=printTable.match(/<tbody>([\s\S]*?)<\/tbody>/)[1];
+assert.equal((printHead.match(/<th[ >]/g)||[]).length,2);assert(printHead.includes('Concepto'));assert(printHead.includes('DÍA COMPLETO'));
 assert(!printHead.includes('<th>T1'));assert(!printHead.includes('<th>T2'));assert(!printHead.includes('<th>T3'));
 assert(!printRows.includes('Saldo de entrada'));
 for(const label of ['Monedas sueltas','Monedas empaquetadas','Billetes','Vales pendientes','Saldo contado a la salida','Diferencia de arqueo'])assert(!printRows.includes(label),label);
-assert(printRows.endsWith('<tr class="dailyTotal"><th>Saldo calculado a la salida</th><td>1350.00 €</td></tr>'));
+assert.match(printRows,/<tr class="grand"><th[^>]*>Saldo calculado a la salida<\/th>[\s\S]*?1350.00 €<\/td><\/tr>$/);
 assert(printRows.includes('RECIBOS P'));assert.equal((printRows.match(/<tr/g)||[]).length,12);
+// Daily output uses the exact same physical page, centering and CSS as shift close.
+const shift=ctx.buildCashbookHtml({...reports[0],date:'2026-11-03'});
+assert.equal(printed.match(/<style>([\s\S]*?)<\/style>/)[1],shift.match(/<style>([\s\S]*?)<\/style>/)[1]);
+for(const marker of ['class="cashbook-page"','class="cashbook-page-cell" align="center" valign="middle"','class="cashbook-sheet"','width:136mm','width:285mm;height:198mm'])assert(printed.includes(marker),marker);
+assert(!printed.includes('class="cashbook-folio"'));assert(!printed.includes('class="signatures"'));
 fs.writeFileSync('/tmp/parking-daily-cashbook.html',printed);
 console.log('Daily cashbook: 3 shifts, P receipts, no duplicate handover balances/vouchers, provisional/missing shifts, manager access, fresh print and network failures verified.');
 })().catch(e=>{console.error(e);process.exitCode=1});
