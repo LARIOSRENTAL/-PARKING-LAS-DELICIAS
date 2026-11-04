@@ -18,16 +18,37 @@ async function configureParkingQzSigning(){if(parkingQzSigningLoaded)return;park
 
 function showParkingQzSetup(){let modal=document.getElementById('parkingQzSetup');if(!modal){modal=document.createElement('div');modal.id='parkingQzSetup';modal.className='modalBack';modal.style.zIndex='20000';modal.innerHTML='<style>#parkingQzSetup{position:fixed;inset:0;background:#14283c99;display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box}#parkingQzSetup.hidden{display:none!important}#parkingQzSetup .modalCard{background:white;color:#172d43;border-radius:14px;width:min(620px,100%);max-height:90vh;overflow:auto;padding:18px;box-sizing:border-box}#parkingQzSetup .modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px}#parkingQzSetup input{max-width:100%;box-sizing:border-box}#parkingQzSetupMsg{white-space:pre-wrap;font-weight:bold;padding:12px 0}</style><div class="modalCard" style="max-width:620px"><div class="modalHead"><h3>Autorizar impresión en este dispositivo</h3><button class="btn light" onclick="document.getElementById(\'parkingQzSetup\').classList.add(\'hidden\')">Cerrar</button></div><div class="modalBody"><p><b>No tienes que escribir: pulsa «Seleccionar archivo» en cada campo.</b></p><p>Selecciona los dos archivos de la carpeta <b>Escritorio → QZ Tray Demo Cert</b>. Se procesan en este navegador y no se suben al servidor.</p><div class="field"><label>Certificado: digital-certificate.txt</label><input id="parkingQzCertificateFile" type="file" accept=".txt,.crt,.pem"></div><div class="field"><label>Clave privada: private-key.pem</label><input id="parkingQzPrivateFile" type="file" accept=".pem"></div><p class="muted">Utiliza Chrome en una ventana normal. La autorización se guarda en este navegador; si borras sus datos o usas otro navegador tendrás que configurarla otra vez.</p><button id="parkingQzSave" class="btn green" onclick="saveParkingQzIdentity()">Guardar autorización local</button><button id="parkingQzVerify" class="btn dark" onclick="verifyParkingQzSetup()">Comprobar conexión e impresora</button><div id="parkingQzSetupMsg" role="status"></div></div></div>';document.body.appendChild(modal)}modal.classList.remove('hidden');if(window.parkingQzRemoteHost){const paragraphs=modal.querySelectorAll('.modalBody p');paragraphs[1].innerHTML='Conexión al ordenador del parking: <b>'+window.parkingQzRemoteHost+'</b>. Copia por USB desde el ordenador los archivos de firma <b>digital-certificate.txt</b> y <b>private-key.pem</b> de la carpeta Escritorio → QZ Tray Demo Cert y selecciónalos aquí. El certificado CA instalado en Android se utiliza para la conexión segura; estos dos archivos autorizan las solicitudes de impresión.'}}
 async function saveParkingQzIdentity(){const msg=document.getElementById('parkingQzSetupMsg'),button=document.getElementById('parkingQzSave'),cert=document.getElementById('parkingQzCertificateFile').files[0],key=document.getElementById('parkingQzPrivateFile').files[0];if(!cert||!key){msg.textContent='Selecciona ambos archivos.';return}button.disabled=true;msg.textContent='Comprobando archivos...';try{if(cert.size>32768||key.size>32768)throw new Error('Los archivos seleccionados no parecen los originales de QZ.');const identity=await parkingQzImportIdentity(await cert.text(),await key.text());await parkingQzIdentityStore('readwrite',identity);document.getElementById('parkingQzCertificateFile').value='';document.getElementById('parkingQzPrivateFile').value='';if(window.qz?.websocket?.isActive())await qz.websocket.disconnect();parkingQzSigningLoaded=false;parkingQzIdentity=null;msg.textContent='Autorización guardada. Comprobando conexión con el ordenador…';await verifyParkingQzSetup()}catch(e){msg.textContent='No se pudo completar la configuración: '+e.message}finally{button.disabled=false}}
-let parkingQzStage='Sin iniciar';
+let parkingQzStage='Sin iniciar',parkingQzConnectPromise=null,parkingQzConnectionNeedsReload=false;
+function parkingQzWithTimeout(operation,message,milliseconds=20000){
+ let timer;return Promise.race([operation,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),milliseconds)})]).finally(()=>clearTimeout(timer));
+}
 async function connectParkingQz(){
+ if(parkingQzConnectPromise)return parkingQzConnectPromise;
+ parkingQzConnectPromise=openParkingQzConnection();
+ try{return await parkingQzConnectPromise}finally{parkingQzConnectPromise=null}
+}
+async function openParkingQzConnection(){
  if(!window.qz?.websocket||!window.qz?.printers)throw new Error('La biblioteca QZ no se ha cargado en Chrome. Comprueba la conexión a Internet y recarga.');
  await configureParkingQzSigning();
  if(!parkingQzIdentity){showParkingQzSetup();const error=new Error('Selecciona el certificado y la clave privada y guarda la autorización local antes de comprobar o imprimir.');error.code='QZ_SETUP_REQUIRED';throw error}
- if(qz.websocket.isActive())return;
+ if(qz.websocket.isActive()){parkingQzConnectionNeedsReload=false;return;}
+ if(parkingQzConnectionNeedsReload)throw Error('El intento anterior no terminó. Recarga esta página antes de volver a comprobar la conexión.');
  parkingQzStage='Conectando con QZ Tray';
- try{await qz.websocket.connect(window.parkingQzRemoteHost?{host:window.parkingQzRemoteHost,usingSecure:true,retries:1,delay:1}:{retries:1,delay:1})}
- catch(e){throw new Error('No se pudo conectar con QZ Tray desde el backoffice: '+(e.message||e)+'. '+(window.parkingQzRemoteHost?'Comprueba que la tablet está en la misma Wi-Fi que el ordenador '+window.parkingQzRemoteHost+', QZ Tray está abierto y el certificado de conexión incluye esa dirección. ':'')+'Si Chrome pide acceso a la red local, pulsa Permitir.')}
+ try{
+  const connection=qz.websocket.connect(window.parkingQzRemoteHost?{host:window.parkingQzRemoteHost,usingSecure:true,retries:0}:{retries:0});
+  await parkingQzWithTimeout(connection,'QZ_CONNECTION_TIMEOUT');
+ }catch(e){
+  const timeout=e.message==='QZ_CONNECTION_TIMEOUT',pending=/connection attempt has not returned|previous disconnect request/i.test(e.message||'');
+  if(timeout||pending){
+   parkingQzConnectionNeedsReload=true;
+   // QZ 2.3 disconnect also closes a socket still in CONNECTING state.
+   try{Promise.resolve(qz.websocket.disconnect()).catch(()=>{})}catch(ignore){}
+   throw Error('No se completó la conexión'+(window.parkingQzRemoteHost?' con '+window.parkingQzRemoteHost:'')+'. Recarga la página para limpiar el intento pendiente. En la tablet, abre el enlace «Abrir conexión del ordenador» y comprueba si aparece una página de QZ o un error de conexión/certificado.');
+  }
+  throw new Error('No se pudo conectar con QZ Tray: '+(e.message||e)+'. '+(window.parkingQzRemoteHost?'Comprueba que la tablet está en la misma Wi-Fi que el ordenador '+window.parkingQzRemoteHost+', QZ Tray está abierto y el certificado de conexión incluye esa dirección. ':'')+'Si Chrome pide acceso a la red local, pulsa Permitir.');
+ }
 }
+
 function hotelCouponPrintPages(html){const doc=new DOMParser().parseFromString(html,'text/html');const coupons=Array.from(doc.querySelectorAll('.coupon'));if(!coupons.length)throw new Error('No se encontraron bonos de hotel para imprimir.');return coupons.map(coupon=>'<!doctype html><html lang="es">'+doc.head.outerHTML+'<body>'+coupon.outerHTML+'</body></html>')}
 async function sendParkingPrint(kind,html,officeOnly=false){
  let monthlyReceipt=false;
@@ -64,7 +85,7 @@ async function sendParkingPrint(kind,html,officeOnly=false){
 async function verifyParkingQzSetup(){
  const message=document.getElementById('parkingQzSetupMsg'),button=document.getElementById('parkingQzVerify');if(button)button.disabled=true;
  message.textContent='Comprobando autorización, conexión e impresora… Si aparece una petición de QZ en el ordenador del parking, pulsa Allow y marca Remember this decision.';
- try{await connectParkingQz();const target=PARKING_PRINTERS.ticket,found=await qz.printers.find(target);if(!(Array.isArray(found)?found.includes(target):found===target))throw Error('Conexión correcta, pero falta la impresora '+target+' en el ordenador.');message.textContent='Configuración completada. Conexión correcta e impresora '+target+' disponible. Cierra esta ventana y pulsa Imprimir ticket de prueba.';return true}
+ try{await connectParkingQz();const target=PARKING_PRINTERS.ticket,found=await parkingQzWithTimeout(qz.printers.find(target),'QZ ha conectado, pero no respondió a la consulta de impresora. Comprueba si hay un aviso pendiente en el ordenador.');if(!(Array.isArray(found)?found.includes(target):found===target))throw Error('Conexión correcta, pero falta la impresora '+target+' en el ordenador.');message.textContent='Configuración completada. Conexión correcta e impresora '+target+' disponible. Cierra esta ventana y pulsa Imprimir ticket de prueba.';return true}
  catch(e){message.textContent=(parkingQzIdentity?'La autorización está guardada, pero la impresión aún no está lista. ':'')+e.message;return false}
  finally{if(button)button.disabled=false}
 }

@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const root=path.join(__dirname,'..'),nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{textContent:'',value:'',disabled:false,files:[{size:100,text:async()=> 'pem'}]});return nodes.get(id)};
-const ctx={console,document:{getElementById:node},window:{},qz:{printers:{find:async()=> 'BIXOLON SRP-350III'},websocket:{isActive:()=>false}},Set,Promise};ctx.window.qz=ctx.qz;vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(root,'backoffice/office-print.js'),'utf8'),ctx);
+const ctx={console,setTimeout,clearTimeout,document:{getElementById:node},window:{},qz:{printers:{find:async()=> 'BIXOLON SRP-350III'},websocket:{isActive:()=>false}},Set,Promise};ctx.window.qz=ctx.qz;vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(root,'backoffice/office-print.js'),'utf8'),ctx);
 (async()=>{
 let stored=0,connections=0;ctx.parkingQzImportIdentity=async()=>({certificate:'cert',privateKey:{}});ctx.parkingQzIdentityStore=async()=>{stored++};ctx.connectParkingQz=async()=>{connections++};
 await ctx.saveParkingQzIdentity();assert.equal(stored,1);assert.equal(connections,1);assert(node('parkingQzSetupMsg').textContent.includes('Configuración completada'));assert.equal(node('parkingQzCertificateFile').value,'');
