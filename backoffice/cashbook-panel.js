@@ -1,11 +1,11 @@
 /* Shift-local cash reconciliation. All money writes are authenticated server RPCs. */
 let cashbookActiveTab='income',cashCountDirty=false,cashCountShiftId=null,cashCountBusy=false;
-const CASHBOOK_TABS=['income','count','withdrawals','expenses','vouchers'];
+const CASHBOOK_TABS=['income','count','withdrawals','expenses','vouchers','shiftSummary'];
 const CASH_COUNT_FIELDS=['opening_balance','loose_coins','wrapped_coins','banknotes','vouchers'];
 let cashDenominationDraft={},cashCountRevision=0,cashCountSavePromise=null,cashCountAutoTimer=null;
 let activeCashVouchers=null,cashValeCancelBusy=false;
-let cashEntryBusy={expense:false,voucher:false},cashEntryPending={};
-function showCashbookTab(tab){cashbookActiveTab=CASHBOOK_TABS.includes(tab)?tab:'income';document.querySelectorAll('#cashbookTabs button').forEach(b=>b.classList.toggle('active',b.dataset.cashTab===cashbookActiveTab));document.querySelectorAll('.cashbookPane').forEach(e=>e.classList.toggle('hidden',e.dataset.cashPane!==cashbookActiveTab));if(cashbookActiveTab==='withdrawals')loadCashWithdrawals();saveParkingNavigation('cashbook')}
+let cashEntryBusy={expense:false,voucher:false},cashEntryPending={},shiftCashbookSummaryLoading=false;
+function showCashbookTab(tab){if(tab==='shiftSummary'&&!canViewShiftCashbookSummary())tab='income';cashbookActiveTab=CASHBOOK_TABS.includes(tab)?tab:'income';document.querySelectorAll('#cashbookTabs button').forEach(b=>b.classList.toggle('active',b.dataset.cashTab===cashbookActiveTab));document.querySelectorAll('.cashbookPane').forEach(e=>e.classList.toggle('hidden',e.dataset.cashPane!==cashbookActiveTab));if(cashbookActiveTab==='withdrawals')loadCashWithdrawals();if(cashbookActiveTab==='shiftSummary')renderShiftCashbookSummary(shiftCashbookSummaryLoading?null:parkingCashbookData,shiftCashbookSummaryLoading);saveParkingNavigation('cashbook')}
 function ownCashbookShift(){return !!currentShift?.id&&currentAccessMode!=='free'&&parkingCashbookData?.shift_id===currentShift.id&&!parkingCashbookData.closed_at}
 function cashCountDraftKey(id){return 'pld_cash_count_v1:'+currentSession?.user?.id+':'+id}
 function cashCountValues(){return {...Object.fromEntries(CASH_COUNT_FIELDS.map(k=>[k,opsEl('cashCount_'+k).value])),denomination_breakdown:cashDenominationDraft}}
@@ -32,6 +32,7 @@ function markCashCountDirty(){cashCountDirty=true;cashCountRevision++;try{sessio
 function updateCashCountTotals(){const v=cashCountValues(),number=k=>normalCashAmount(v[k])??0,cash=number('loose_coins')+number('wrapped_coins')+number('banknotes'),counted=cash+number('vouchers'),t=cashbookTotals(parkingCashbookData?.rows||[]),expected=number('opening_balance')+t.cash-Number(parkingCashbookData?.cash_state?.expense_total||0)-Number(parkingCashbookData?.withdrawal_total_eur||0),difference=Math.round((counted-expected)*100)/100;opsEl('cashCountTotal').textContent=money(cash);opsEl('cashCountBalance').textContent=money(counted);opsEl('cashCountExpected').textContent=money(expected);opsEl('cashCountDifference').textContent=money(difference);opsEl('cashCountDifference').style.color=difference<0?'#c62828':difference>0?'#1664bd':'#16804a';opsEl('cashCountMessage').textContent=cashCountDirty?'Cambios pendientes de guardar.':(parkingCashbookData?.cash_state?.saved?'Arqueo guardado.':'Comprueba el saldo de entrada y rellena el dinero contado.');}
 function renderCashbookPanel(data){
  updateCashbookHeading(data);
+ renderShiftCashbookSummary(data);
  if(!data){for(const key of CASH_COUNT_FIELDS){if(!cashCountDirty)opsEl('cashCount_'+key).value='';opsEl('cashCount_'+key).disabled=true}for(const id of ['cashCountTotal','cashCountBalance','cashCountExpected','cashCountDifference'])opsEl(id).textContent='—';opsEl('cashCountSave').disabled=true;opsEl('cashCountMessage').textContent='Resumen no disponible. Pulsa Actualizar caja para cargar tu turno; estos campos no representan un saldo de cero.';return}
  const own=ownCashbookShift();if(cashCountShiftId!==data?.shift_id||!cashCountDirty){cashCountShiftId=data?.shift_id||null;cashCountDirty=false;let draft=null;try{if(own)draft=JSON.parse(sessionStorage.getItem(cashCountDraftKey(cashCountShiftId))||'null')}catch(e){}for(const k of CASH_COUNT_FIELDS)opsEl('cashCount_'+k).value=(k==='opening_balance'||k==='vouchers')?String(data?.cash_state?.[k]??0):(draft?.[k]??String(data?.cash_state?.[k]??0));cashCountDirty=!!draft;renderCashDenominationInputs({...data?.cash_state,...draft},own);}
  for(const group of ['loose_coins','wrapped_coins','banknotes','packed_banknotes'])for(const [key]of cashDenominations(group))opsEl('cashDenom_'+group+'_'+key).disabled=!own;
@@ -142,3 +143,13 @@ async function cancelLegacyCashVale(){
 }
 
 function blockCashCountDrag(event){if(event.target?.closest?.('[id^="cashDenom_"]')){event.preventDefault();if(event.dataTransfer)event.dataTransfer.dropEffect='none'}}
+
+function canViewShiftCashbookSummary(){return ['admin','manager'].includes(currentProfile?.role)}
+function renderShiftCashbookSummary(data,loading=false){
+ shiftCashbookSummaryLoading=loading;
+ const allowed=canViewShiftCashbookSummary(),button=opsEl('cashbookShiftSummaryTab'),body=opsEl('cashbookShiftSummaryBody');
+ button?.classList.toggle('hidden',!allowed);if(!body)return;
+ if(!allowed){body.innerHTML='';return;}
+ if(loading||!data?.shift_id){body.innerHTML='<p class="muted">'+(loading?'Cargando el resumen del turno seleccionado…':'Selecciona fecha, turno y empleado para consultar su resumen.')+'</p>';return;}
+ body.innerHTML='<h3>Resumen de cierre · Hoja de caja nº '+esc(data.cashbook_number??'—')+'</h3><p><b>Turno '+esc(data.shift_code)+' · '+esc(cashbookShiftDateLabel(data))+'</b> · '+esc(data.employee_name||'')+'</p><p class="muted">'+(data.closed_at?'Turno cerrado · '+esc(fmt(data.closed_at)):'Turno abierto · resumen provisional')+'</p>'+renderCashbookSummary(data);
+}
