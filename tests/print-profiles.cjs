@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.join(__dirname,'..'),html=fs.readFileSync(path.join(root,'backoffice/index.html'),'utf8');
-const source=html.slice(html.indexOf('async function sendParkingPrint('),html.indexOf('function voucherVehicleType('));
+const office=fs.readFileSync(path.join(root,'backoffice/office-print.js'),'utf8');const source=office.slice(office.indexOf('async function sendParkingPrint('),office.indexOf('async function verifyParkingQzSetup('));
 const jobs=[],configs=[],ctx={console,connectParkingQz:async()=>{},PARKING_PRINTERS:{stay:'RICOH MP 2003',cashbook:'HOJA DE CAJA',withdrawal:'HOJA DE CAJA',cashvale:'HOJA DE CAJA',cashexpense:'HOJA DE CAJA',invoice:'FACTURAS',ticket:'BIXOLON SRP-350III'},hotelCouponPrintPages:h=>[h.replace('COUPONS','FIRST'),h.replace('COUPONS','SECOND')],qz:{printers:{find:async name=>name,details:async()=>[{name:'HOJA DE CAJA',trays:['Bandeja 2','Bandeja 1','Bandeja bypass']}]},configs:{create:(name,opts)=>{const config={name,options:JSON.parse(JSON.stringify(opts))};configs.push(config);return config}},print:async(config,data)=>jobs.push({config,data})}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(root,'backoffice/print-profiles.js'),'utf8')+'\n'+source,ctx);
 (async()=>{
