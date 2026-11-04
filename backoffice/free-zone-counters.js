@@ -1,7 +1,7 @@
 (function(){
-const nav=document.querySelector('.mainNav');
+const nav=document.getElementById('rotationNav');
 if(!nav)return;
-const bar=document.createElement('div');bar.id='zoneAvailability';bar.style.cssText='display:none;flex-wrap:wrap;gap:6px;padding:8px;background:#eef5f9;border-bottom:1px solid #dce5ef;font-size:13px';nav.after(bar);
+const bar=document.createElement('div');bar.id='zoneAvailability';bar.style.cssText='display:none;flex-wrap:wrap;gap:6px;padding:8px;background:#eef5f9;border-bottom:1px solid #dce5ef;font-size:13px;position:relative;z-index:93';nav.after(bar);bar.textContent='Consultando plazas libres…';
 let running=false;
 async function refresh(){
 const area=document.querySelector('.mainNav button.active')?.dataset.area;
