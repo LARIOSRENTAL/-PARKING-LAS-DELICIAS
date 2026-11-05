@@ -151,7 +151,7 @@ async function closeShiftAndLogout(){
    report=await readClosingCashbook(shift);if(!report.cash_state?.saved)throw Error('No se pudo confirmar el arqueo guardado. Vuelve a intentarlo.');if(!cashbookCanCarryForward({...report,cash_state:{...report.cash_state,saved:false}}))throw Error('La caja ha cambiado durante la confirmación. Revisa el Resumen de caja antes de cerrar.');
   }
   try{const printReport=await attachCashbookSheetNumber({...report});await Promise.race([sendParkingPrint('cashbook',buildCashbookHtml(printReport),true),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora no responde')),8000))]);}catch(printError){console.warn('Impresión de caja fallida, cierre continúa',printError);}
-  try{await Promise.race([printTotalStays(true),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora de estancias no responde')),15000))]);}catch(printError){console.warn('Impresión de estancias fallida, cierre continúa',printError);}
+  try{await Promise.race([printTotalStays(true,report),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora de estancias no responde')),15000))]);}catch(printError){console.warn('Impresión de estancias fallida, cierre continúa',printError);}
   const res=await db.rpc('parking_close_cash_shift',{p_shift_id:shift.id,p_expected:report});if(res.error)throw Error('No se pudo cerrar el turno: '+res.error.message);
   sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload();
  }catch(e){alert(e.message)}finally{closingShift=false;if(button)button.disabled=false}
@@ -476,12 +476,17 @@ function renderTotalStays(){
  updateStayDebts('total',rows.map((x,i)=>({key:i,end:x.presence==='DENTRO'?x.end:null,vehicle:x.vehicle,vehicleType:x.vehicleType})));
 }
 async function loadTotalStays(){await Promise.all([loadReservations(),loadInside()]);await loadOutside();renderTotalStays()}
-async function printTotalStays(automatic=false){
+async function printTotalStays(automatic=false,shiftReport=null){
+ const printShift=shiftReport?{...shiftReport}:currentShift?{...currentShift}:null;
+ const printEmployee=printShift?.employee_name||currentProfile?.full_name||'—';
+ const printTimestamp=printShift?.generated_at||new Date().toISOString();
+ const printShiftDate=String(printShift?.date||printShift?.shift_date||'').slice(0,10);
+ const printShiftLabel=printShift?.shift_code?'Turno '+printShift.shift_code+(printShiftDate?' · '+printShiftDate.split('-').reverse().join('/'):''):'Sin turno operativo';
  const remotePreview=!automatic&&typeof shouldPreviewParkingPrint==='function'&&shouldPreviewParkingPrint();
  const w=automatic||remotePreview?{close(){}}:window.open('','_blank');if(!w)return alert('Permite ventanas emergentes para imprimir las estancias.');
  try{
   await loadTotalStays();
-  const rows=totalStayDisplayRows(automatic?'late':totalStayOrder),date=new Date().toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}),within=rows.filter(x=>x.presence==='DENTRO').length;
+  const rows=totalStayDisplayRows(automatic?'late':totalStayOrder),date=new Date(printTimestamp).toLocaleString('es-ES',{timeZone:'Europe/Madrid',dateStyle:'short',timeStyle:'short'}),within=rows.filter(x=>x.presence==='DENTRO').length;
   const fmtCompact=v=>v?new Date(v).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
   const days=(x)=>Math.max(1,Math.ceil((new Date(x.end).getTime()-new Date(x.start).getTime())/86400000))||'—';
   const excess=(x)=>{const ms=Date.now()-new Date(x.end).getTime();if(x.presence!=='DENTRO'||!Number.isFinite(ms)||ms<=0)return '—';const mins=Math.ceil(ms/60000);return Math.floor(mins/60)+'h '+String(mins%60).padStart(2,'0')+'m';};
@@ -509,13 +514,13 @@ async function printTotalStays(automatic=false){
   '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{padding:0;margin:0;width:100%;color:#152639;font-family:Arial,sans-serif;font-size:12px}'+
   '.printPage{width:210mm;max-width:none;height:297mm;padding:8mm 13mm;margin:0 auto;break-after:page;page-break-after:always}.printPage:last-child{break-after:auto;page-break-after:auto}'+
   'header{height:17mm;display:flex;align-items:center;justify-content:space-between;gap:4mm;border-bottom:1px solid #325477;margin-bottom:2mm}'+
-  'header img{width:28mm;height:auto;max-height:12mm;object-fit:contain}h1{font-size:12px;margin:0}.sub{font-size:7px;color:#52667b}.meta{font-size:7px;text-align:right}.summary{margin-bottom:2mm;font-weight:700;font-size:8px}'+
+  'header img{width:28mm;height:auto;max-height:12mm;object-fit:contain}h1{font-size:12px;margin:0}.sub{font-size:7px;color:#52667b}.printEmployee{font-size:10px;font-weight:bold;margin-top:2px;overflow-wrap:anywhere}.meta{font-size:8px;text-align:right}.summary{margin-bottom:2mm;font-weight:700;font-size:8px}'+
   'table{border-collapse:collapse;width:184mm;max-width:100%;table-layout:fixed;margin:0 auto}thead{display:table-header-group}th,td{border:.5px solid #acb8c4;padding:0 .8mm;height:4mm;line-height:1.05;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}td{font-size:11px}td:first-child{font-size:10px;padding:0 .3mm}td:nth-child(6),td:nth-child(7){font-size:10px}th{background:#285781;color:white;font-weight:bold;font-size:10px;height:4.5mm}'+
   'tbody tr{break-inside:avoid;page-break-inside:avoid}.outside td{background:#fbe5e8}.inside td{background:#fff2d3}.overdue td{background:#ffd1d1}.center{text-align:center}.plate{font-weight:700}footer{margin-top:2mm;font-size:7px;color:#52667b}'+
   '@media print{html,body{width:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.printPage{margin:0 auto}}'+
   '</style></head><body>';
   for(let p=0;p<pages.length;p++){
-   html+='<section class="printPage"><header><img src="https://lariosrental.github.io/-PARKING-LAS-DELICIAS/backoffice/assets/logo-las-delicias.png?v=original-20261014" alt="Logo oficial Las Delicias"><div><h1>TOTAL ESTANCIAS</h1><div class="sub">Estancias por días · ordenadas por fin previsto</div></div><div class="meta">'+esc(date)+'<br>Página '+(p+1)+' / '+pages.length+'</div></header>'+
+   html+='<section class="printPage"><header><img src="https://lariosrental.github.io/-PARKING-LAS-DELICIAS/backoffice/assets/logo-las-delicias.png?v=original-20261014" alt="Logo oficial Las Delicias"><div><h1>TOTAL ESTANCIAS</h1><div class="sub">Estancias por días · ordenadas por fin previsto</div><div class="printEmployee">Empleado: '+esc(printEmployee)+'</div></div><div class="meta">'+esc(printShiftLabel)+'<br>Fecha y hora: '+esc(date)+'<br>Página '+(p+1)+' / '+pages.length+'</div></header>'+
    '<div class="summary">Total: '+rows.length+' · Dentro: '+within+' · Fuera con plaza: '+(rows.length-within)+'</div>'+
    '<table><colgroup><col style="width:6mm"><col style="width:22mm"><col style="width:23mm"><col style="width:13mm"><col style="width:8mm"><col style="width:28mm"><col style="width:28mm"><col style="width:17mm"><col style="width:20mm"><col style="width:19mm"></colgroup>'+
    '<thead><tr><th>Nº</th><th>Vehículo</th><th>Matrícula</th><th>Plaza</th><th>Días</th><th>Entrada</th><th>Fin previsto</th><th>Estado</th><th>Exceso</th><th>Debe</th></tr></thead><tbody>';
