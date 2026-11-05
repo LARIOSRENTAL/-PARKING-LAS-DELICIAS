@@ -3,6 +3,7 @@
  const originalBuild=buildVoucherHtml,originalPrint=printEntryVoucher;
  async function details(r){
   const out={name:'',numbers:[]};let hotelId=r.hotel_id||null;
+  if(!hotelId&&r.id){const current=await db.from('reservations').select('hotel_id').eq('id',r.id).maybeSingle();if(current.error)throw current.error;hotelId=current.data?.hotel_id||null;}
   if(r.payment_method==='hotel_voucher'){
    const v=await db.from('parking_hotel_vouchers').select('number,code,batch_id').eq('redeemed_reservation_id',r.id).order('number',{ascending:true});
    if(v.error)throw v.error;
@@ -30,7 +31,8 @@
  buildVoucherHtml=function(r,spot,entry,audit){
   let html=originalBuild(r,spot,entry,audit);
   if(!['hotel_voucher','hotel_voucher_old'].includes(r?.payment_method))return html;
-  const name=String(r._hotelPrintName||parkingHotels.find(h=>h.id===r.hotel_id)?.name||r.parking_hotels?.name||'HOTEL NO INDICADO').toUpperCase();
+  const name=String(r._hotelPrintName||r.hotel_name||parkingHotels.find(h=>h.id===r.hotel_id)?.name||r.parking_hotels?.name||'').toUpperCase();
+  if(!name.trim())throw Error('Completa el nombre del hotel en Modificar estancia antes de imprimir el bono.');
   const safe=esc(name),codes=r._hotelPrintCodes||[];
   if(!codes.length)throw Error('No constan los números de los bonos utilizados. Revisa el pago antes de imprimir.');
   const control=esc(codes.join(', '));

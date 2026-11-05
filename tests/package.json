@@ -10,7 +10,8 @@
     "test:stay-documents": "node stay-payment-documents-db.cjs && node stay-payment-documents-ui.cjs",
     "test:rotation-current-month": "node rotation-current-month-db.cjs && node rotation-current-month-ui.cjs",
     "test:subscriber-collection-login": "node subscriber-collection-login-ui.cjs",
-    "test:pending-stays": "node reusable-stay-controls-db.cjs && node pending-stay-edit-ui.cjs"
+    "test:pending-stays": "node reusable-stay-controls-db.cjs && node pending-stay-edit-ui.cjs",
+    "test:legacy-hotel-all-flows": "node legacy-hotel-all-flows-ui.cjs && node legacy-hotel-all-flows-db.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10",
