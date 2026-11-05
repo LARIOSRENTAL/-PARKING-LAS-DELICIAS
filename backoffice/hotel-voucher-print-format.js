@@ -32,15 +32,17 @@
   if(!['hotel_voucher','hotel_voucher_old'].includes(r?.payment_method))return html;
   const name=String(r._hotelPrintName||parkingHotels.find(h=>h.id===r.hotel_id)?.name||r.parking_hotels?.name||'HOTEL NO INDICADO').toUpperCase();
   const safe=esc(name),codes=r._hotelPrintCodes||[];
-  if(codes.length){
-   const voucherCodes=esc(codes.join(', '));
-   html=html.replace('</table>','<tr><th>Bonos hotel</th><td>'+voucherCodes+'</td></tr></table>');
-  }
+  if(!codes.length)throw Error('No constan los números de los bonos utilizados. Revisa el pago antes de imprimir.');
+  const control=esc(codes.join(', '));
+  html=html.replace(/(<tr><th>Nº Control<\/th><td>)[^<]*(<\/td><\/tr>)/,(_,before,after)=>before+control+after);
+  html=html.replace(/(<div class="control-number">)[^<]*(<\/div>)/,(_,before,after)=>before+control+after);
+  html=html.replace(/<title>[\s\S]*?<\/title>/,()=>'<title>Bono '+control+'</title>');
   html=html.replace(/<tr><th>Tipo vehículo<\/th><td>[^<]*<\/td><\/tr>/,'<tr><th>Hotel</th><td>'+safe+'</td></tr>');
   html=html.replace(/<tr><th>Precio<\/th><td>[^<]*<\/td><\/tr>/,'');
   html=html.replace(/<div class="type">[^<]*<\/div>/,'<div class="type">'+safe+'</div>');
   return html;
  };
+ window.hydrateParkingHotelVoucher=async function(r){if(!['hotel_voucher','hotel_voucher_old'].includes(r?.payment_method))return r;const d=await details(r);return {...r,_hotelPrintName:d.name,_hotelPrintCodes:d.numbers};};
  printEntryVoucher=async function(win,r,spot,entry,audit){
   if(!['hotel_voucher','hotel_voucher_old'].includes(r?.payment_method))return originalPrint(win,r,spot,entry,audit);
   try{

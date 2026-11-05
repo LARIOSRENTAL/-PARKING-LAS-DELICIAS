@@ -7,7 +7,8 @@
     "test:shift-summary": "node shift-cashbook-summary.cjs",
     "test:checkout-context": "node rotation-checkout-context.cjs",
     "test:reinforcement-availability": "node reinforcement-availability.cjs",
-    "test:stay-documents": "node stay-payment-documents-db.cjs && node stay-payment-documents-ui.cjs"
+    "test:stay-documents": "node stay-payment-documents-db.cjs && node stay-payment-documents-ui.cjs",
+    "test:rotation-current-month": "node rotation-current-month-db.cjs && node rotation-current-month-ui.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.10",

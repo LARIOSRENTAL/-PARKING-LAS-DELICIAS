@@ -25,7 +25,7 @@ function updateConversionReturn(){
 async function printConvertedStayVoucher(id,spotCode,originalEntry){
  const r=await db.from('reservations').select('*').eq('id',id).single();if(r.error)throw r.error;if(!r.data)throw Error('No se pudo recuperar la estancia creada');
  const reservation=r.data,audit=await registerIssuedDocument('stay_voucher','reservation',id,{reference:reservation.reference,plate:reservation.plate,spot_code:spotCode,entry_at:originalEntry,exit_at:reservation.exit_at,amount_eur:reservation.amount_eur});
- await sendParkingPrint('stay',buildVoucherHtml(reservation,spotCode,originalEntry,audit));
+ await sendParkingPrint('stay',buildVoucherHtml(await hydrateParkingHotelVoucher(reservation),spotCode,originalEntry,audit));
 }
 async function confirmRotationToStay(){
  const button=opsEl('convertConfirm');if(button.disabled||!currentRotationSession)return;

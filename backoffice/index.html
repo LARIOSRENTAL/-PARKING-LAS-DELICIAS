@@ -238,9 +238,9 @@ async function selectRotationFromList(btn){historyModal.classList.add('hidden');
 let rotationReportRows=[];
 function rotationDateLocal(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
 async function rotationTickets(){
- const privileged=['admin','manager'].includes(currentProfile?.role),today=rotationDateLocal(new Date());
+ const privileged=['admin','manager'].includes(currentProfile?.role),today=rotationCurrentMonth().today;
  historyTitle.textContent='Tickets emitidos · Rotación';
- historyBody.innerHTML='<div class="panel"><div class="grid3">'+(privileged?'<div class="field"><label>Desde</label><input type="date" id="rotationDateFrom" value="'+today+'"></div><div class="field"><label>Hasta</label><input type="date" id="rotationDateTo" value="'+today+'"></div>':'')+'<div class="field"><label>Forma de pago</label><select id="rotationPayFilter"><option value="">Todas</option><option value="cash">Efectivo</option><option value="card">Tarjeta</option></select></div></div><div class="grid3"><div class="field"><label>Importe mínimo</label><input type="number" min="0" step="0.01" id="rotationMinAmount"></div><div class="field"><label>Importe máximo</label><input type="number" min="0" step="0.01" id="rotationMaxAmount"></div><div class="field"><label>Día de la semana</label><select id="rotationWeekday"><option value="">Todos</option>'+['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'].map((x,i)=>'<option value="'+i+'">'+x+'</option>').join('')+'</select></div></div><button class="mini blue" onclick="loadRotationReport()">Buscar tickets</button> '+(privileged?'<button class="mini" onclick="exportRotationExcel()">Descargar Excel</button>':'')+'</div><div id="rotationReportResults"></div>';
+ historyBody.innerHTML='<div class="panel"><div class="grid3">'+'<div class="field"><label>Desde</label><input type="date" id="rotationDateFrom" value="'+today+'"></div><div class="field"><label>Hasta</label><input type="date" id="rotationDateTo" value="'+today+'"></div>'+'<div class="field"><label>Forma de pago</label><select id="rotationPayFilter"><option value="">Todas</option><option value="cash">Efectivo</option><option value="card">Tarjeta</option></select></div></div><div class="grid3"><div class="field"><label>Importe mínimo</label><input type="number" min="0" step="0.01" id="rotationMinAmount"></div><div class="field"><label>Importe máximo</label><input type="number" min="0" step="0.01" id="rotationMaxAmount"></div><div class="field"><label>Día de la semana</label><select id="rotationWeekday"><option value="">Todos</option>'+['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'].map((x,i)=>'<option value="'+i+'">'+x+'</option>').join('')+'</select></div></div><button class="mini blue" onclick="loadRotationReport()">Buscar tickets</button> '+(privileged?'<button class="mini" onclick="exportRotationExcel()">Descargar Excel</button>':'')+'</div><div id="rotationReportResults"></div>';
  historyModal.classList.remove('hidden');await loadRotationReport();
 }
 async function loadRotationReport(){
@@ -550,7 +550,7 @@ async function reprintStayVoucher(sessionId){
  const r=reservations.find(x=>x.id===ps.reservation_id);
  if(!r)return alert('No se encuentra la reserva');
  const spot=ps.parking_spots?.code||spots.find(x=>x.id===ps.spot_id)?.code||'';
- const html=buildVoucherHtml(r,spot,ps.actual_entry_at||ps.planned_entry_at,null);
+ let html;try{html=buildVoucherHtml(await hydrateParkingHotelVoucher(r),spot,ps.actual_entry_at||ps.planned_entry_at,null)}catch(e){return alert('No se pudo preparar el bono: '+e.message)}
  const btn=document.getElementById('reprint-'+sessionId);
  if(btn){btn.disabled=true;btn.textContent='Conectando...'}
  try{
@@ -644,7 +644,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="entry-ticket.js?v=center-spot-code-20261029"></script>
 <script src="operations.js?v=checkout-context-20261104"></script><script src="rotation-commerce.js?v=commerce-value-fast-scan-20261020"></script>
 <script src="blacklist.js?v=20261015"></script>
-<script src="hotel-vouchers.js?v=scanner-separator-20261031"></script>
+<script src="hotel-vouchers.js?v=hotel-control-20261105"></script>
 <script src="bank-invoice-mail.js?v=subscriber-method-20261017"></script>
 
 <script src="authorized-plates.js?v=entry-warning-20261026"></script>
@@ -659,8 +659,8 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="subscriber-deadlines.js?v=october-practice-20261020-20261019a"></script>
 <script src="billing-exports.js?v=real-billing-only-20261101"></script>
 <script src="admin-print-preview.js?v=cash-a4-stacked-20261020"></script><datalist id="subscriberSpotChoices"></datalist>
-<script src="stay-workflow.js?v=payment-documents-20261105"></script>
-<script src="hotel-voucher-print-format.js?v=stay-control-and-vouchers-20261105"></script>
+<script src="stay-workflow.js?v=hotel-bond-controls-20261105"></script>
+<script src="hotel-voucher-print-format.js?v=redeemed-bond-controls-20261105"></script>
 <script src="subscriber-plates.js?v=complete-20261026"></script>
 <script src="shared-availability.js?v=complete-20261026"></script>
 <script src="commerce-sales-and-unpaid-stays.js?v=named-hotel-20261105"></script>
@@ -689,4 +689,4 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
  document.addEventListener('change',upperUserInput,true);
 })();
 </script>
-<script src="daily-cashbook.js?v=single-line-labels-20261104"></script><script src="free-zone-counters.js?v=20261104-visible2"></script><script src="stay-payment-documents.js?v=initial-and-extensions-20261105"></script></body></html>
+<script src="daily-cashbook.js?v=single-line-labels-20261104"></script><script src="free-zone-counters.js?v=20261104-visible2"></script><script src="stay-payment-documents.js?v=initial-and-extensions-20261105"></script><script src="rotation-current-month.js?v=employee-print-only-20261105"></script></body></html>

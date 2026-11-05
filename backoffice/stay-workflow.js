@@ -67,6 +67,7 @@ async function modifyStayEditRestore(state,values){await modifyReservation(state
 async function printStayEditVoucher(reservation,change=null){
  const spot=spots.find(x=>x.id===reservation.assigned_spot_id)?.code||reservation.parking_space_label||'';
  const session=insideSessions.find(x=>x.reservation_id===reservation.id);
+ reservation=await hydrateParkingHotelVoucher(reservation);
  let html=buildVoucherHtml(reservation,spot,session?.actual_entry_at||reservation.entry_at,null);
  if(change){
   const changes=await db.from('parking_stay_changes').select('id,created_at').eq('reservation_id',reservation.id).order('created_at',{ascending:true});
