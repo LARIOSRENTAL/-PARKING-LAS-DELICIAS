@@ -6,9 +6,11 @@
     "test:fin-hotel": "node fin-hotel-ui.cjs && node fin-hotel-db.cjs",
     "test:shift-summary": "node shift-cashbook-summary.cjs",
     "test:checkout-context": "node rotation-checkout-context.cjs",
-    "test:reinforcement-availability": "node reinforcement-availability.cjs"
+    "test:reinforcement-availability": "node reinforcement-availability.cjs",
+    "test:stay-documents": "node stay-payment-documents-db.cjs && node stay-payment-documents-ui.cjs"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.10"
+    "@electric-sql/pglite": "0.5.10",
+    "jsdom": "26.1.0"
   }
 }

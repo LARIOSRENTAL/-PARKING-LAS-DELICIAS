@@ -33,9 +33,8 @@
   const name=String(r._hotelPrintName||parkingHotels.find(h=>h.id===r.hotel_id)?.name||r.parking_hotels?.name||'HOTEL NO INDICADO').toUpperCase();
   const safe=esc(name),codes=r._hotelPrintCodes||[];
   if(codes.length){
-   const control=esc(codes.join(', '));
-   html=html.replace(/(<tr><th>Nº Control<\/th><td>)[^<]*(<\/td><\/tr>)/,'$1'+control+'$2');
-   html=html.replace(/(<div class="control-number">)[^<]*(<\/div>)/,'$1'+control+'$2');
+   const voucherCodes=esc(codes.join(', '));
+   html=html.replace('</table>','<tr><th>Bonos hotel</th><td>'+voucherCodes+'</td></tr></table>');
   }
   html=html.replace(/<tr><th>Tipo vehículo<\/th><td>[^<]*<\/td><\/tr>/,'<tr><th>Hotel</th><td>'+safe+'</td></tr>');
   html=html.replace(/<tr><th>Precio<\/th><td>[^<]*<\/td><\/tr>/,'');
