@@ -27,13 +27,20 @@ createManualReservation=async function(){
 const paidStayCollection=openStayCollection;
 openStayCollection=async function(id){const r=reservations.find(x=>x.id===id);if(!r)return;if(r.payment_status!=='paid')return alert('El pago inicial de esta reserva antigua no consta registrado. Verifica el cobro antes de emitir su ticket; no se ha realizado ningún nuevo cargo.');return paidStayCollection(id)};
 function stayAttentionClass(end){return ({overdue:'lateRow',due_soon:'soonRow'})[insideAttention({planned_exit_at:end})]||''}
+function stayRemainingText(end,now=Date.now()){
+ const seconds=Math.max(0,Math.floor((new Date(end).getTime()-now)/1000));
+ if(!Number.isFinite(seconds))return '—';if(seconds===0)return 'Tiempo previsto agotado';
+ if(seconds<60)return 'Quedan '+seconds+' s';
+ const hours=Math.floor(seconds/3600),minutes=Math.floor(seconds%3600/60);
+ return 'Quedan '+(hours?hours+' h ':'')+minutes+' min '+seconds%60+' s';
+}
 const renderOutsideWithFinish=renderOutside;
 renderOutside=function(){renderOutsideWithFinish();const rows=opsEl('outsideBody')?.querySelectorAll('tbody tr')||[];outsideSessions.forEach((r,i)=>{if(rows[i])rows[i].className=stayAttentionClass(r.exit_at)})};
 renderTotalStays=function(){
  const el=opsEl('totalStaysBody');if(!el)return;const query=normalizeRotationPlate(opsEl('totalStaySearch')?.value||'');const rows=totalStayDisplayRows().filter(x=>!query||[x.plate,x.reference,x.spot].some(value=>normalizeRotationPlate(value||'').includes(query)));
  let h='<div class="panel"><b>'+rows.length+' estancias activas</b><div class="tableWrap"><table class="tbl"><thead><tr><th>Plaza</th><th>Referencia</th><th>Cliente</th><th>Vehículo / matrícula</th><th>Inicio</th><th>Fin previsto</th><th>Situación</th><th>Acciones</th></tr></thead><tbody>';
- for(const x of rows){const r=reservations.find(r=>r.reference===x.reference),attention=insideAttention({planned_exit_at:x.end});let actions='';if(r)actions='<button class="mini blue" onclick="moveActiveStay(\''+r.id+'\')">Cambiar plaza</button><button class="mini blue" onclick="reprintActiveStay(\''+r.id+'\')">Reimprimir bono</button><button class="mini" onclick="modifyReservation(\''+r.id+'\')">Modificar estancia</button>';if(r)actions+='<button class="mini '+(x.presence==='DENTRO'?'green':'blue')+'" onclick="toggleTotalStayPresence(this,\''+r.id+'\')">'+(x.presence==='DENTRO'?'Dar salida':'Dar entrada')+'</button>';
-  h+='<tr class="'+stayAttentionClass(x.end)+'"><td><b>'+esc(x.spot)+'</b></td><td>'+esc(x.reference)+'</td><td>'+esc(x.customer)+'</td><td><b>'+esc(x.plate)+'</b><br>'+esc(x.vehicle)+'</td><td>'+fmt(x.start)+'</td><td>'+fmt(x.end)+'</td><td><span class="tag '+(x.presence==='DENTRO'?'amber':'red')+'">'+esc(x.presence)+'</span>'+(attention==='overdue'?'<br><b>TIEMPO EXCEDIDO</b>':attention==='due_soon'?'<br>Finaliza en menos de 3 h':'')+'</td><td><div class="actions">'+actions+'</div></td></tr>';
+ for(const x of rows){const r=reservations.find(r=>r.id===x.reservationId||r.reference===x.reference),attention=insideAttention({planned_exit_at:x.end});let actions='';if(r)actions='<button class="mini blue" onclick="moveActiveStay(\''+r.id+'\')">Cambiar plaza</button><button class="mini blue" onclick="reprintActiveStay(\''+r.id+'\')">Reimprimir bono</button><button class="mini" onclick="modifyReservation(\''+r.id+'\')">Modificar estancia</button>';if(r)actions+='<button class="mini '+(x.presence==='DENTRO'?'green':'blue')+'" onclick="toggleTotalStayPresence(this,\''+r.id+'\')">'+(x.presence==='DENTRO'?'Dar salida':'Dar entrada')+'</button>';
+  h+='<tr class="'+stayAttentionClass(x.end)+'"><td><b>'+esc(x.spot)+'</b></td><td>'+esc(x.reference)+'</td><td>'+esc(x.customer)+'</td><td><b>'+esc(x.plate)+'</b><br>'+esc(x.vehicle)+'</td><td>'+fmt(x.start)+'</td><td>'+fmt(x.end)+'</td><td><span class="tag '+(x.presence==='DENTRO'?'amber':'red')+'">'+esc(x.presence)+'</span>'+(attention==='overdue'?'<br><b>TIEMPO EXCEDIDO</b>':attention==='due_soon'?'<br><span data-stay-countdown="'+esc(x.end)+'">'+esc(stayRemainingText(x.end))+'</span>':'')+'</td><td><div class="actions">'+actions+'</div></td></tr>';
  }el.innerHTML=h+'</tbody></table></div></div>';
 };
 async function reprintActiveStay(id){const r=reservations.find(x=>x.id===id);if(!r)return;try{const changes=await db.from('parking_stay_changes').select('*').eq('reservation_id',id).order('created_at',{ascending:false}).limit(1);if(changes.error)throw changes.error;await printStayEditVoucher(r,changes.data?.[0]||null)}catch(e){alert('No se pudo reimprimir el bono: '+e.message)}}
