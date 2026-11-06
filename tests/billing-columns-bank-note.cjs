@@ -18,7 +18,7 @@ const root=path.join(__dirname,'..'),html=fs.readFileSync(path.join(root,'backof
  for(const method of ['cash','card','online'])assert(!new JSDOM(w.buildParkingInvoiceHtml({...invoice,payment_context:{payment_method:method}})).window.document.querySelector('.bank-payment-note'));
  assert(!new JSDOM(w.buildParkingInvoiceHtml({...invoice,payment_context:{payment_method:'cash',automatic_bank_payment:true}})).window.document.querySelector('.bank-payment-note'),'Saved cash payment takes precedence over flags');
  fs.writeFileSync(path.join(out,'invoice.html'),w.buildParkingInvoiceHtml({...invoice,payment_context:{payment_method:'bank'}}));
- const pdfModule=await import(pathToFileURL(path.join(root,'supabase/functions/bank-invoice-mail/invoice-pdf.mjs'))),pdfLib=require('pdf-lib'),logoPath=process.env.PARKING_TEST_LOGO;
- if(logoPath){const logo=fs.readFileSync(logoPath);for(const method of ['bank','transfer','cash']){const bytes=await pdfModule.buildInvoicePdf({...invoice,payment_context:{payment_method:method}},pdfLib,logo);assert.equal((await pdfLib.PDFDocument.load(bytes)).getPageCount(),1);fs.writeFileSync(path.join(out,'invoice-'+method+'.pdf'),bytes);}}
+ const pdfModule=await import(pathToFileURL(path.join(root,'supabase/functions/bank-invoice-mail/invoice-pdf.mjs'))),logoPath=process.env.PARKING_TEST_LOGO;
+ if(logoPath){const pdfLib=require('pdf-lib'),logo=fs.readFileSync(logoPath);for(const method of ['bank','transfer','cash']){const bytes=await pdfModule.buildInvoicePdf({...invoice,payment_context:{payment_method:method}},pdfLib,logo);assert.equal((await pdfLib.PDFDocument.load(bytes)).getPageCount(),1);fs.writeFileSync(path.join(out,'invoice-'+method+'.pdf'),bytes);}}
  dom.window.close();console.log('PASS: exact A–O column order, text postal codes/phone/identifiers, numeric amounts, no duplicate discount deduction, bank/transfer notes in HTML and one-page PDF, cash/card excluded.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
