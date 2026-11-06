@@ -13,7 +13,13 @@ export async function buildInvoicePdf(invoice,lib,logoBytes){
  draw('Fecha: '+date,right-mm(49),top-14,times,9.5);draw('N.I.F.: '+invoice.customer_tax_id,right-mm(49),top-26,times,9.5);draw('C.P.: '+(String(invoice.customer_address||'').match(/\b\d{5}\b/)?.[0]||''),right-mm(49),top-38,times,9.5);
  const month=new Date(invoice.billing_month+'T12:00:00Z').toLocaleDateString('es-ES',{month:'long',year:'numeric'}),description='Importe correspondiente al alquiler de Parking para el vehículo '+(invoice.vehicle||'')+' matrícula '+(invoice.plate||'')+' durante el mes de '+month;
  wrap(description,arial,10,mm(145)).forEach((line,i)=>draw(line,x+mm(18),top-boxHeight-mm(23)-i*15,arial,10));
+ const paymentMethod=String(invoice.payment_context?.payment_method||invoice.payment_method||invoice.snapshot?.payment_method||(invoice.payment_context?.automatic_bank_payment?'bank':'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/[ -]+/g,'_');
+ if(['bank','bank_transfer','transfer','transferencia','transferencia_bancaria','direct_debit','domiciliacion','domiciliacion_bancaria','sepa','wire_transfer'].includes(paymentMethod)){
+  draw('BANCO',x+mm(18),mm(135),arial,9);
+  wrap('El abono de esta factura se acreditara con el adeudo en Cta. de la misma',arial,9,right-x-mm(38)).forEach((line,i)=>draw(line,x+mm(38),mm(135)-i*12,arial,9));
+ }
  const totals=[['PRECIO',invoice.amount_before_vat],['DTO.',invoice.discount_eur],['I.V.A. 21%',invoice.vat_eur],['TOTAL',invoice.total_eur]],column=width/4,base=mm(82),height=mm(12);
  totals.forEach(([label,amount],i)=>{const xx=x+i*column;page.drawRectangle({x:xx,y:base,width:column,height,color:gray,borderColor:rgb(.3,.3,.3),borderWidth:.6});draw(label,xx+6,base+13,arial,9);const value=Number(amount||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});draw(value,xx+column-arialBold.widthOfTextAtSize(value,10)-6,base+13,arialBold,10)});
  doc.setTitle('Factura '+invoice.number);doc.setAuthor('Parking Las Delicias');return doc.save();
 }
+

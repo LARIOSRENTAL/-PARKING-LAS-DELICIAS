@@ -43,3 +43,4 @@ Deno.serve(async(req:Request)=>{
  return json({ok:true,sent,blocked,failed,ready:config.ready,error:config.error||null});
  }catch(e){console.error('Bank invoice worker failed:',(e as Error).message);return json({error:'No se pudo completar el envío de facturas'},500)}finally{if(lease)await admin.rpc('parking_mail_worker_finish',{p_lease:lease})}
 });
+
