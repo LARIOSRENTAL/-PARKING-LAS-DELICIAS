@@ -1,3 +1,24 @@
+/* Keep remembered login usernames separate from the subscriber directory search. */
+const staffLoginUsernamesKey='pld_staff_login_usernames';
+function readStaffLoginUsernames(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(staffLoginUsernamesKey)||'[]');
+  return Array.isArray(saved)?[...new Set(saved.filter(value=>typeof value==='string'&&value.length<=254&&/^[^\s@]+@[^\s@]+$/.test(value)).map(value=>value.trim().toLowerCase()))].slice(0,30):[];
+ }catch(_){return [];}
+}
+function renderStaffLoginUsernames(){
+ const list=document.getElementById('staffLoginUsernames');if(!list)return;
+ list.replaceChildren(...readStaffLoginUsernames().map(value=>{const option=document.createElement('option');option.value=value;return option;}));
+}
+function rememberStaffLoginUsername(value){
+ const username=String(value||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+$/.test(username)||username.length>254)return;
+ const names=[username,...readStaffLoginUsernames().filter(name=>name!==username)].slice(0,30);
+ try{localStorage.setItem(staffLoginUsernamesKey,JSON.stringify(names));}catch(_){}
+ renderStaffLoginUsernames();
+}
+renderStaffLoginUsernames();
+window.addEventListener('storage',event=>{if(event.key===staffLoginUsernamesKey||event.key===null)renderStaffLoginUsernames();});
+
 /* A row payment is independent of the optional invoice-selection checkboxes. */
 const subscriberSinglePayments=new Set();
 function subscriberCollectionStatus(message,error=false){
