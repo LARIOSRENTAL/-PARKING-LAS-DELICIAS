@@ -8,7 +8,7 @@ create table reservations(id uuid primary key default gen_random_uuid(),referenc
 create table parking_sessions(id uuid primary key default gen_random_uuid(),reservation_id uuid,vehicle_type_id uuid,plate text,vehicle_make_model text,customer_name text,customer_phone text,planned_exit_at timestamptz,updated_at timestamptz);create table parking_events(id uuid,session_id uuid,event_type text,event_at timestamptz);
 create table parking_hotel_vouchers(number int primary key,code text,batch_id uuid,redeemed_reservation_id uuid,redeemed_at timestamptz,redeemed_by uuid);
 create table parking_legacy_hotel_vouchers(reservation_id uuid,hotel_voucher_number text unique,day_number int,recorded_by uuid,unique(reservation_id,day_number));
-create table parking_stay_changes(id uuid primary key,reservation_id uuid,created_by uuid,created_at timestamptz default now(),payment_method text,amount_eur numeric,before_data jsonb,after_data jsonb);
+create table parking_stay_changes(id uuid primary key,reservation_id uuid,created_by uuid,created_at timestamptz default now(),payment_method text constraint parking_stay_changes_payment_method_check check(payment_method in ('cash','card','hotel_voucher')),amount_eur numeric,before_data jsonb,after_data jsonb);
 create table parking_cash_movements(id uuid default gen_random_uuid(),source_key text,category text,entity_type text,entity_id uuid,reference text,plate text,description text,amount_eur numeric,payment_method text,user_id uuid,shift_id uuid,employee_name text,details jsonb);
 create table rotation_sessions(id uuid primary key,converted_reservation_id uuid);
 create function private.stay_price(uuid,int,timestamptz)returns numeric language sql as $$select $2*20$$;
@@ -21,6 +21,7 @@ insert into vehicle_types values('10000000-0000-0000-0000-000000000001','TURISMO
 const scalar=async(sql,args=[])=>(await db.query(sql,args)).rows[0].v;
 // An old record without a name remains movable, but cannot redeem more vouchers unnamed.
 const historical=await scalar("insert into reservations(vehicle_type_id,payment_method)values('10000000-0000-0000-0000-000000000001','hotel_voucher_old')returning id v");
+await db.exec(fs.readFileSync(path.join(__dirname,'../database/allow_legacy_hotel_voucher_stay_changes.sql'),'utf8'));
 await db.exec(fs.readFileSync(path.join(__dirname,'../database/legacy_hotel_names_all_flows.sql'),'utf8'));
 const type='10000000-0000-0000-0000-000000000001',sid='30000000-0000-0000-0000-000000000001';await db.query('insert into rotation_sessions values($1,null)',[sid]);
 const convert=(name,commit=true,finish=false,notes='Llaves en oficina')=>scalar("select parking_convert_rotation_stay_named_hotel($1,$2,null,1,'SEAT','hotel_voucher_old',array['ANT-ONE'],'cash',false,$3,0,$4,$5,$6)v",[sid,type,commit,name,notes,finish]);
