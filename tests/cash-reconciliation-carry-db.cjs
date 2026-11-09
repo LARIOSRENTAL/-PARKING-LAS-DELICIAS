@@ -1,0 +1,38 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{PGlite}=require('@electric-sql/pglite');
+(async()=>{
+ const db=new PGlite();
+ await db.exec(`create schema private;create schema auth;
+ create function auth.uid()returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;
+ create function private.is_staff()returns boolean language sql as $$select auth.uid() is not null$$;
+ create function private.parking_cash_amount(text)returns numeric language sql as $$select $1::numeric$$;
+ create table staff_shifts(id uuid primary key,user_id uuid,shift_date date,shift_code int,shift_number int,opened_at timestamptz,closed_at timestamptz);
+ create table staff_profiles(user_id uuid,role text,active boolean,full_name text);
+ create table parking_cash_counts(shift_id uuid primary key,opening_balance numeric,loose_coins numeric,wrapped_coins numeric,banknotes numeric,vouchers numeric,updated_at timestamptz default now(),updated_by uuid,final_report jsonb);
+ create table parking_cash_movements(id uuid primary key,shift_id uuid,amount_eur numeric,payment_method text,paid_at timestamptz default now(),category text,entity_type text,entity_id uuid);
+ create table parking_cash_entries(id uuid,shift_id uuid,amount_eur numeric,kind text,created_at timestamptz);
+ create table parking_cash_withdrawals(id uuid,shift_id uuid,amount_eur numeric,created_at timestamptz);
+ create table parking_monthly_receipts(payment_id uuid);
+ create table staff_activity_log(shift_id uuid,user_id uuid,action text,entity_type text,entity_id uuid,details jsonb);
+ `);
+ await db.exec(`create function private.parking_cash_state(uuid)returns jsonb language plpgsql as $$begin return private.parking_cash_state_before_vouchers($1);end$$;`);
+ await db.exec(fs.readFileSync(path.join(__dirname,'../database/cash_reconciliation_carry_forward.sql'),'utf8'));
+ const uid='00000000-0000-0000-0000-000000000001',a='00000000-0000-0000-0000-000000000002',b='00000000-0000-0000-0000-000000000003',c='00000000-0000-0000-0000-000000000004';
+ const scalar=async(sql,args=[])=>(await db.query(sql,args)).rows[0].v;
+ await db.query("select set_config('test.uid',$1,false)",[uid]);
+ await db.query("insert into staff_profiles values($1,'admin',true,'Test')",[uid]);
+ await db.query("insert into staff_shifts values($1,$4,'2026-11-09',2,81,'2026-11-09 06:00Z','2026-11-09 14:00Z'),($2,$4,'2026-11-09',3,82,'2026-11-09 14:00Z',null),($3,$4,'2026-11-10',1,83,'2026-11-09 22:00Z',null)",[a,b,c,uid]);
+ await db.query("insert into parking_cash_counts(shift_id,opening_balance,loose_coins,wrapped_coins,banknotes,vouchers,final_report) values($1,3420.1,86.2,1394,2203,0,'{\"cash_state\":{\"difference\":0}}')",[a]);
+ await db.query("insert into parking_cash_movements(id,shift_id,amount_eur,payment_method)values(gen_random_uuid(),$1,246.1,'cash'),(gen_random_uuid(),$2,135.8,'cash')",[a,b]);
+ const state=id=>scalar('select private.parking_cash_state($1)v',[id]);
+ let s=await state(a);assert.equal(s.expected_balance,3666.2);assert.equal(s.difference,17);
+ s=await state(b);assert.equal(s.opening_balance,3666.2);assert.equal(s.cash_total,3683.2);assert.equal(s.expected_balance,3802);
+ const save=(id,opening,notes)=>scalar('select private.parking_save_cash_count_before_vouchers($1,$2)v',[id,{opening_balance:opening,loose_coins:125.5,wrapped_coins:1466.5,banknotes:notes,vouchers:0}]);
+ s=await save(b,3683.2,2227);assert.equal(s.opening_balance,3666.2);assert.equal(s.counted_total,3819);assert.equal(s.expected_balance,3802);assert.equal(s.difference,17);
+ s=await save(b,99999,2227);assert.equal(s.opening_balance,3666.2);assert.equal(s.difference,17);
+ const closed=await scalar("select parking_cashbook('2026-11-09',2,$1)v",[a]);assert.equal(closed.cash_state.difference,17);assert.equal(closed.rows[0].amount_eur,246.1);
+ await db.query("update staff_shifts set closed_at='2026-11-09 22:00Z' where id=$1",[b]);s=await state(c);assert.equal(s.opening_balance,3802);assert.equal(s.counted_total,3819);assert.equal(s.difference,17);
+ // A shortage also carries forward, without changing physical notes or coins.
+ await db.query('update parking_cash_counts set banknotes=2200 where shift_id=$1',[b]);s=await state(c);assert.equal(s.opening_balance,3802);assert.equal(s.counted_total,3792);assert.equal(s.difference,-10);
+ await db.query("select set_config('test.uid','',false)");await assert.rejects(save(c,0,0),/No autorizado/);
+ console.log('PASS: corrected closed report, surplus and shortage carry forward, physical counts preserved, stale opening balances rejected and unauthenticated saves blocked.');await db.close();
+})().catch(e=>{console.error(e);process.exitCode=1});
