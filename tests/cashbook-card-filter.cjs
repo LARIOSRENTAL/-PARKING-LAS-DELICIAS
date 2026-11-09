@@ -1,4 +1,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom');
+const vm=require('node:vm'),path=require('node:path'),page=new JSDOM(fs.readFileSync(path.join(__dirname,'../backoffice/index.html'),'utf8')).window.document;
+for(const script of page.scripts)if(!script.src)new vm.Script(script.textContent);
+assert.equal(page.querySelector('script[src^="cashbook-card-filter"]').parentElement,page.body,'Filter loader must be in the real page body, outside invoice templates');
 const dom=new JSDOM('<div id="cashbookBody"></div>',{runScripts:'outside-only'}),w=dom.window;
 const rows=[{id:'s',category:'stay',paid_at:'2026-11-09T10:00:00Z',payment_method:'card',reference:'STAY',amount_eur:20},{id:'c',category:'rotation',paid_at:'2026-11-09T07:00:00Z',payment_method:'cash',reference:'CASH',amount_eur:10},{id:'a',category:'subscriber',paid_at:'2026-11-09T09:00:00Z',payment_method:'card',reference:'SUB',amount_eur:30},{id:'r',category:'rotation',paid_at:'2026-11-09T08:00:00Z',payment_method:'card',reference:'ROT',amount_eur:5}];
 Object.assign(w,{currentProfile:{role:'manager'},parkingCashbookData:{shift_id:'one',rows},esc:String,fmt:String,money:v=>v+' €',renderCashbook:()=>'<div class="grid4"><div class="panel"><b>Tarjeta</b><div>55 €</div></div></div><h3>Original grouped income</h3>'});
