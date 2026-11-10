@@ -288,3 +288,36 @@ createStay=async function(){
  }catch(e){reShowMessage('No se pudo comprobar la disponibilidad. No se ha creado la estancia: '+e.message,true)}finally{button.disabled=false}
 };
 
+
+/* Check only the typed plate through the temporary reinforcement access. */
+const reinforcementPlateTimers=new Map();
+function reinforcementNormalizedPlate(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
+async function checkReinforcementPlate(id,notify=false){
+ const input=reEl(id),plate=reinforcementNormalizedPlate(input.value);
+ let warning=reEl(id+'Warning');
+ if(!warning){warning=document.createElement('div');warning.id=id+'Warning';warning.setAttribute('role','alert');warning.style.cssText='color:#b51d28;font-weight:900;white-space:pre-wrap;margin:8px 0';input.after(warning);}
+ warning.textContent='';
+ if(!reinforcementCode||plate.length<3)return false;
+ try{
+  const data=await reCall('parking_reinforcement_check_plate',{p_code:reinforcementCode,p_plate:plate});
+  if(reinforcementNormalizedPlate(input.value)!==plate)return true;
+  const text=data.blocked?'ENTRADA BLOQUEADA · '+plate+'\n'+(data.blocked.observation||'')+'\nNo emitir ticket ni dar entrada al vehículo.':data.authorized?'VEHÍCULO AUTORIZADO · '+plate+'\n'+(data.authorized.observation||''):'';
+  warning.textContent=text;
+  if(data.blocked&&notify)alert(text);
+  return !!data.blocked;
+ }catch(error){warning.textContent='No se pudo comprobar la matrícula: '+error.message;if(notify)throw error;return true;}
+}
+for(const id of ['plate','stayPlate']){
+ reEl(id).addEventListener('input',()=>{if(reEl(id+'Warning'))reEl(id+'Warning').textContent='';clearTimeout(reinforcementPlateTimers.get(id));reinforcementPlateTimers.set(id,setTimeout(()=>checkReinforcementPlate(id),300));});
+ reEl(id).addEventListener('change',()=>checkReinforcementPlate(id));
+}
+function withReinforcementPlateCheck(previous,id,buttonId){
+ return async function(...args){
+  const button=reEl(buttonId);if(button.disabled)return;button.disabled=true;
+  try{if(await checkReinforcementPlate(id,true))return;button.disabled=false;return await previous.apply(this,args);}
+  catch(error){reShowMessage(error.message,true);}
+  finally{button.disabled=false;}
+ };
+}
+rotationEntry=withReinforcementPlateCheck(rotationEntry,'plate','enterButton');
+createStay=withReinforcementPlateCheck(createStay,'stayPlate','stayButton');
