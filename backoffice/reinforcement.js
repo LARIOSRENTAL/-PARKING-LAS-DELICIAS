@@ -71,6 +71,15 @@ async function reCall(name, args) {
   if (result.error) throw new Error(result.error.message || 'No se pudo completar la operación.');
   return result.data;
 }
+function resetReinforcementStayForm(){
+ const types=reinforcementData?.types||[];
+ const defaultType=types.find(t=>String(t.code||'').toUpperCase()==='XL')||types.find(t=>/\bXL\b|COCHERA/i.test(String(t.name||'')));
+ if(defaultType)reEl('type').value=String(defaultType.id);
+ reEl('days').value='1';
+ for(const id of ['stayPlate','model','name','staySpot'])reEl(id).value='';
+ const warning=reEl('stayPlateWarning');if(warning)warning.textContent='';
+ refreshReinforcementStayDates();
+}
 async function enter() {
   const button = document.querySelector('#login button');
   const pin = reEl('code').value.trim();
@@ -88,10 +97,8 @@ async function enter() {
     reEl('tariff').innerHTML = data.tariffs.map(t => '<option value="' + reEscape(t.code) + '">' + reEscape(t.name) + '</option>').join('');
     await reloadReinforcementSpots();
     reEl('type').innerHTML = data.types.map(t => '<option value="' + reEscape(t.id) + '">' + reEscape(t.name) + '</option>').join('');
-    const xlType = data.types.find(t => String(t.code || t.name || '').trim().toUpperCase() === 'XL');
-    if (xlType) reEl('type').value = String(xlType.id);
     reEl('days').innerHTML = Array.from({length:24}, (_,i) => '<option value="' + (i+1) + '">' + (i+1) + (i ? ' días' : ' día') + '</option>').join('');
-    refreshReinforcementStayDates();
+    resetReinforcementStayForm();
     reEl('login').classList.add('hidden');
     reEl('work').classList.remove('hidden');
     tab('rotation');
@@ -183,10 +190,7 @@ async function createStay() {
       p_name: reEl('name').value.trim().toUpperCase() || null
     });
     reShowMessage('Estancia creada sin cobro. Reserva ' + result.reference + ' · ' + result.plate + ' · pendiente de cobro.', false);
-    reEl('stayPlate').value = '';
-    reEl('model').value = '';
-    reEl('name').value = '';
-    reEl('staySpot').value='';
+    resetReinforcementStayForm();
     await reloadReinforcementStaySpots().catch(()=>{});
     reEl('stayPlate').focus();
   } catch (error) {
