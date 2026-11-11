@@ -275,3 +275,25 @@ window.addEventListener('keydown',event=>{
   return result;
  };
 })();
+
+/* Keep reservation entry confirmation visible independently of the form scroll. */
+function compactStayCollectionDialog(){
+ const confirm=opsEl('stayCollectConfirm'),modal=opsEl('parkingOpsModal');
+ if(!confirm||!modal)return;
+ const card=confirm.closest('.modalCard'),body=confirm.closest('.modalBody'),actions=confirm.closest('.actions');
+ if(!card||!body||!actions)return;
+ if(!opsEl('stayCollectionCompactStyle')){
+  const style=document.createElement('style');style.id='stayCollectionCompactStyle';
+  style.textContent='.stayCollectionCard{width:calc(100vw - 28px)!important;max-width:900px!important;max-height:94vh!important;display:flex!important;flex-direction:column;overflow:hidden!important}.stayCollectionCard>.modalHead{flex-shrink:0;padding:12px 18px}.stayCollectionCard>.modalBody{overflow:auto;min-height:0;padding:12px 18px}.stayCollectionCard .field{margin-bottom:7px;gap:3px}.stayCollectionCard input,.stayCollectionCard select{padding:7px 10px;min-height:36px}.stayCollectionCard textarea{padding:7px 10px;min-height:48px;height:48px}.stayCollectionCard #stayCollectVouchers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}.stayCollectionCard .stayCollectionFooter{padding:9px 18px;border-top:1px solid #ddd;background:white;flex-shrink:0}.stayCollectionCard .stayCollectionFooter .actions{margin-top:0!important}.stayCollectionCard #parkingOpsMessage:empty{display:none}.stayCollectionCard details{margin:8px 0}.stayCollectionCard summary{cursor:pointer;font-weight:700}@media(max-width:540px){.stayCollectionCard #stayCollectVouchers{grid-template-columns:1fr}}';
+  document.head.appendChild(style);
+ }
+ card.classList.add('stayCollectionCard');
+ const notes=opsEl('stayCollectNotes')?.closest('.field');
+ if(notes&&!notes.closest('details')){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Notas de la estancia'+(opsEl('stayCollectNotes').value.trim()?' · con anotaciones':' (opcional)');notes.before(details);details.append(summary,notes);}
+ const footer=document.createElement('div');footer.className='stayCollectionFooter';
+ footer.append(actions);
+ const message=opsEl('parkingOpsMessage');if(message)footer.append(message);
+ card.append(footer);
+}
+const openStayCollectionBeforeCompactDialog=openStayCollection;
+openStayCollection=function(...args){const result=openStayCollectionBeforeCompactDialog.apply(this,args);compactStayCollectionDialog();return result;};
