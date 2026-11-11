@@ -32,7 +32,11 @@ async function openParkingQzConnection(){
  await configureParkingQzSigning();
  if(!parkingQzIdentity){showParkingQzSetup();const error=new Error('Selecciona el certificado y la clave privada y guarda la autorización local antes de comprobar o imprimir.');error.code='QZ_SETUP_REQUIRED';throw error}
  if(qz.websocket.isActive()){parkingQzConnectionNeedsReload=false;return;}
- if(parkingQzConnectionNeedsReload)throw Error('El intento anterior no terminó. Recarga esta página antes de volver a comprobar la conexión.');
+ if(parkingQzConnectionNeedsReload){
+  parkingQzStage='Limpiando conexión anterior';
+  try{await parkingQzWithTimeout(Promise.resolve(qz.websocket.disconnect()),'La conexión anterior sigue cerrándose.',3000)}catch(ignore){}
+  parkingQzConnectionNeedsReload=false;
+ }
  parkingQzStage='Conectando con QZ Tray';
  try{
   const connection=qz.websocket.connect(window.parkingQzRemoteHost?{host:window.parkingQzRemoteHost,usingSecure:true,retries:0}:{retries:0});
@@ -42,8 +46,8 @@ async function openParkingQzConnection(){
   if(timeout||pending){
    parkingQzConnectionNeedsReload=true;
    // QZ 2.3 disconnect also closes a socket still in CONNECTING state.
-   try{Promise.resolve(qz.websocket.disconnect()).catch(()=>{})}catch(ignore){}
-   throw Error('No se completó la conexión'+(window.parkingQzRemoteHost?' con '+window.parkingQzRemoteHost:'')+'. Recarga la página para limpiar el intento pendiente. En la tablet, abre el enlace «Abrir conexión del ordenador» y comprueba si aparece una página de QZ o un error de conexión/certificado.');
+   try{await parkingQzWithTimeout(Promise.resolve(qz.websocket.disconnect()),'Cierre pendiente',3000);parkingQzConnectionNeedsReload=false}catch(ignore){}
+   throw Error('No se completó la conexión'+(window.parkingQzRemoteHost?' con '+window.parkingQzRemoteHost:'')+'. La autorización sigue guardada. Comprueba que QZ Tray está abierto en el ordenador y que la tablet usa la Wi-Fi del parking. Abre «Abrir conexión del ordenador»: si no aparece una página de QZ, revisa la red o el certificado. Después puedes pulsar Comprobar conexión de nuevo.');
   }
   throw new Error('No se pudo conectar con QZ Tray: '+(e.message||e)+'. '+(window.parkingQzRemoteHost?'Comprueba que la tablet está en la misma Wi-Fi que el ordenador '+window.parkingQzRemoteHost+', QZ Tray está abierto y el certificado de conexión incluye esa dirección. ':'')+'Si Chrome pide acceso a la red local, pulsa Permitir.');
  }
