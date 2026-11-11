@@ -64,6 +64,7 @@ function stayEndChanged(){const ctx=window.stayPaymentCurrent;if(!ctx)return;con
 async function updateCombinedStayPayment(fromDays=false){
  const ctx=window.stayPaymentCurrent;if(!ctx)return;const serial=++ctx.quoteSerial;ctx.quoteReady=false;opsEl('stayCollectConfirm').disabled=true;
  const days=Number(opsEl('stayCollectDays').value),method=opsEl('stayCollectMethod').value;
+ opsEl('stayCollectConfirm').textContent=method==='hotel_voucher'||method==='hotel_voucher_old'?'Dar entrada':'Cobrar y dar entrada';
  if(!Number.isInteger(days)||days<1||days>24){opsEl('parkingOpsMessage').textContent='La duración debe estar entre 1 y 24 días.';return}
  if(fromDays||!ctx.end)ctx.end=new Date(new Date(ctx.entry).getTime()+days*86400000).toISOString();
  const end=new Date(ctx.end),error=combinedStayDateError(ctx,days,end);opsEl('parkingOpsMessage').textContent=error;if(error)return;
