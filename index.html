@@ -60,6 +60,7 @@
 </div>
 <button id="quoteBtn" class="btn" onclick="quoteBooking()"><i class="fa-solid fa-magnifying-glass"></i> CONSULTAR DISPONIBILIDAD Y PRECIO</button>
 <div id="quoteBox"></div>
+<div id="paymentNotice" role="status"></div>
 </section>
 
 <section class="card hidden" id="customerCard">
@@ -67,9 +68,9 @@
 <div class="field"><label>Nombre y apellidos</label><input id="customerName" class="upper" autocomplete="name" placeholder="NOMBRE Y APELLIDOS"></div>
 <div class="grid2"><div class="field"><label>Teléfono</label><input id="customerPhone" inputmode="tel" autocomplete="tel" placeholder="TELÉFONO"></div><div class="field"><label>Email</label><input id="customerEmail" class="upper" type="email" autocomplete="email" placeholder="CORREO@EJEMPLO.COM"></div></div>
 <div class="grid2"><div class="field"><label>Matrícula <span style="font-weight:600;color:#7d8b98">(opcional)</span></label><input id="plate" class="upper" autocomplete="off" placeholder="PUEDES AÑADIRLA DESPUÉS"></div><div class="field"><label>Marca / modelo <span style="font-weight:600;color:#7d8b98">(opcional)</span></label><input id="vehicleModel" class="upper" placeholder="PUEDES AÑADIRLO DESPUÉS"></div></div><div class="hint">Si no conoces todavía la matrícula o el modelo, podrás facilitarlos al personal del parking antes de la entrada.</div>
-<button id="bookBtn" class="btn" onclick="createBooking()">CONTINUAR CON LA RESERVA</button>
+<button id="bookBtn" class="btn" onclick="createBooking()">IR AL PAGO SEGURO</button>
 <div class="policy-note"><i class="fa-solid fa-triangle-exclamation"></i> Las reservas realizadas no admiten cancelación.</div>
-<div class="hint">Durante la fase de pruebas la reserva queda retenida temporalmente hasta completar el proceso de pago.</div><div id="bookingMsg"></div>
+<div class="hint">La reserva se confirma cuando se completa el pago.</div><div id="bookingMsg"></div>
 </section>
 
 <section class="benefits" aria-label="Ventajas del parking">
@@ -94,6 +95,9 @@
 <script>
 const FN='https://vcwbfljcqpqkmuzcpboi.supabase.co/functions/v1/';
 let lastQuote=null,selectedVehicleType='TURISMO';
+const checkoutAvailability=location.protocol==='https:'
+ ? fetch(FN+'public-booking',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(data=>data.ready===true).catch(()=>false)
+ : Promise.resolve(false);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>Number(v).toLocaleString('es-ES',{style:'currency',currency:'EUR'});const fmt=v=>v?new Date(v).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}):'';
 for(let i=1;i<=24;i++){const o=document.createElement('option');o.value=i;o.textContent=i+(i===1?' DÍA':' DÍAS');days.appendChild(o)}
@@ -105,7 +109,44 @@ document.querySelectorAll('.info-btn').forEach(btn=>btn.addEventListener('click'
 document.querySelectorAll('.vehicle-btn').forEach(btn=>btn.addEventListener('click',()=>{selectedVehicleType=btn.dataset.value;document.querySelectorAll('.vehicle-btn').forEach(b=>b.classList.toggle('active',b===btn));closeInfoPops();invalidateQuote()}));[entryDate,entryHour,entryMinute,days].forEach(el=>el.addEventListener('change',invalidateQuote));
 document.querySelectorAll('.upper').forEach(el=>el.addEventListener('input',()=>{const start=el.selectionStart,end=el.selectionEnd;el.value=el.value.toUpperCase();try{el.setSelectionRange(start,end)}catch{}}));
 async function postFn(name,body){const r=await fetch(FN+name,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.detail||data.error||'ERROR DE CONEXIÓN');return data}
-async function quoteBooking(){const iso=entryIso();if(!iso){quoteBox.innerHTML='<div class="msg error">INDICA FECHA Y HORA DE ENTRADA.</div>';return}quoteBtn.disabled=true;lastQuote=null;customerCard.classList.add('hidden');quoteBox.innerHTML='<div class="msg">CONSULTANDO DISPONIBILIDAD…</div>';try{const q=await postFn('public-quote',{vehicleType:selectedVehicleType,entryAt:iso,durationDays:Number(days.value)});lastQuote=q;if(!q.available){quoteBox.innerHTML='<div class="msg error">NO HAY DISPONIBILIDAD PARA LAS FECHAS SELECCIONADAS.</div>';return}quoteBox.innerHTML=`<div class="quote"><div class="price">${money(q.priceEur)}</div><div class="available">DISPONIBLE</div><div class="times">Entrada: ${esc(fmt(q.entryAt))} · Salida prevista: ${esc(fmt(q.exitAt))}</div></div>`;customerCard.classList.remove('hidden');setTimeout(()=>quoteBox.scrollIntoView({behavior:'smooth',block:'center'}),100)}catch(e){quoteBox.innerHTML=`<div class="msg error">${esc(String(e.message).toUpperCase())}</div>`}finally{quoteBtn.disabled=false}}
-async function createBooking(){if(!lastQuote){bookingMsg.innerHTML='<div class="msg error">CONSULTA PRIMERO LA DISPONIBILIDAD.</div>';return}const name=customerName.value.trim().toUpperCase(),phone=customerPhone.value.trim(),email=customerEmail.value.trim().toUpperCase(),mat=plate.value.trim().toUpperCase(),model=vehicleModel.value.trim().toUpperCase();if(name.length<2||phone.length<5||!email.includes('@')){bookingMsg.innerHTML='<div class="msg error">COMPLETA NOMBRE, TELÉFONO Y EMAIL.</div>';return}bookBtn.disabled=true;bookingMsg.innerHTML='<div class="msg">CREANDO RESERVA…</div>';try{const r=await postFn('public-booking',{vehicleType:selectedVehicleType,entryAt:entryIso(),durationDays:Number(days.value),customerName:name,customerPhone:phone,customerEmail:email,plate:mat,vehicleMakeModel:model});const emailNote=r.emailSent?`<div class="confirmation-note"><i class="fa-solid fa-envelope-circle-check"></i> Hemos enviado el bono de reserva a <strong>${esc(email)}</strong>.</div>`:'';customerCard.innerHTML=`<div class="quote success"><div>RESERVA CREADA CORRECTAMENTE</div><strong>${esc(r.reservation.reference)}</strong><div>${money(r.reservation.amount_eur)}</div><div class="times">Entrada: ${esc(fmt(r.reservation.entry_at))}<br>Salida prevista: ${esc(fmt(r.reservation.exit_at))}</div><div class="policy-note"><i class="fa-solid fa-triangle-exclamation"></i> Las reservas realizadas no admiten cancelación.</div>${emailNote}</div>`;lastQuote=null;customerCard.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){bookingMsg.innerHTML=`<div class="msg error">${esc(String(e.message).toUpperCase())}</div>`;bookBtn.disabled=false}}
+async function quoteBooking(){const iso=entryIso();if(!iso){quoteBox.innerHTML='<div class="msg error">INDICA FECHA Y HORA DE ENTRADA.</div>';return}quoteBtn.disabled=true;lastQuote=null;customerCard.classList.add('hidden');quoteBox.innerHTML='<div class="msg">CONSULTANDO DISPONIBILIDAD…</div>';try{const q=await postFn('public-quote',{vehicleType:selectedVehicleType,entryAt:iso,durationDays:Number(days.value)});lastQuote=q;if(!q.available){quoteBox.innerHTML='<div class="msg error">NO HAY DISPONIBILIDAD PARA LAS FECHAS SELECCIONADAS.</div>';return}quoteBox.innerHTML=`<div class="quote"><div class="price">${money(q.priceEur)}</div><div class="available">DISPONIBLE</div><div class="times">Entrada: ${esc(fmt(q.entryAt))} · Salida prevista: ${esc(fmt(q.exitAt))}</div></div>`;if (await checkoutAvailability && lastQuote===q) customerCard.classList.remove('hidden');
+else if (lastQuote===q) quoteBox.insertAdjacentHTML('beforeend','<p class="hint">El pago online aún no está disponible.</p>');setTimeout(()=>quoteBox.scrollIntoView({behavior:'smooth',block:'center'}),100)}catch(e){quoteBox.innerHTML=`<div class="msg error">${esc(String(e.message).toUpperCase())}</div>`}finally{quoteBtn.disabled=false}}
+async function createBooking(){
+ const quote=lastQuote;
+ if(!quote||!await checkoutAvailability||lastQuote!==quote)return;
+ const name=customerName.value.trim(),phone=customerPhone.value.trim(),email=customerEmail.value.trim();
+ if(name.length<2||phone.length<5||!customerEmail.checkValidity()||!email){
+  bookingMsg.textContent='Completa nombre, teléfono y correo electrónico.';return;
+ }
+ bookBtn.disabled=true;
+ bookingMsg.textContent='Abriendo el pago seguro…';
+ try{
+  const result=await postFn('public-booking',{vehicleType:quote.vehicleType,entryAt:quote.entryAt,
+   durationDays:quote.durationDays,expectedPriceEur:quote.priceEur,customerName:name,customerPhone:phone,
+   customerEmail:email,plate:plate.value.trim(),vehicleMakeModel:vehicleModel.value.trim()});
+  const checkout=new URL(result.checkoutUrl);
+  if(checkout.origin!=='https://checkout.stripe.com')throw new Error('No se pudo abrir el pago seguro.');
+  location.assign(checkout.href);
+ }catch(error){
+  bookingMsg.textContent=error.message;
+  bookBtn.disabled=false;
+ }
+}
+async function showPaymentResult(){
+ const sessionId=new URLSearchParams(location.search).get('pago');
+ if(!sessionId)return;
+ if(sessionId==='cancelado'){paymentNotice.textContent='No se ha confirmado la reserva. Puedes volver a consultar disponibilidad.';return;}
+ if(!sessionId.startsWith('cs_live_'))return;
+ paymentNotice.textContent='Comprobando el pago…';
+ for(let attempt=0;attempt<6;attempt++){
+  try{
+   const result=await postFn('public-booking',{action:'status',sessionId});
+   if(result.paid){paymentNotice.textContent='Pago confirmado. Referencia de reserva: '+result.reference;return;}
+  }catch{}
+  await new Promise(resolve=>setTimeout(resolve,1500));
+ }
+ paymentNotice.textContent='El pago está pendiente de confirmación. Si ya has pagado, contacta con el Parking antes de repetir la reserva.';
+}
+showPaymentResult();
 </script>
 </body></html>
