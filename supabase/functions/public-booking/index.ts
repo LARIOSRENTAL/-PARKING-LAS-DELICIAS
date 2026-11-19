@@ -37,7 +37,7 @@ async function validSignature(body: string, header: string, secret: string) {
 Deno.serve(async req => {
   const key = Deno.env.get("PARKING_STRIPE_SECRET_KEY");
   const signingSecret = Deno.env.get("PARKING_STRIPE_WEBHOOK_SECRET");
-  const ready = Boolean(key?.startsWith("sk_live_") && signingSecret?.startsWith("whsec_") &&
+  const ready = Boolean(key && /^(?:rk|sk)_live_/.test(key) && signingSecret?.startsWith("whsec_") &&
     Deno.env.get("PARKING_WEB_PAYMENTS_ENABLED") === "true");
   if (req.method === "OPTIONS") return new Response(null, {headers:cors});
   if (req.method === "GET") return json({ready});
