@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Parking Las Delicias · Reservas</title>
 <meta name="description" content="Reserva tu plaza en Parking Las Delicias, en el centro de Málaga. Vigilado y abierto 24 horas.">
+<meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#f6f8fb">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <style>
@@ -27,6 +28,14 @@
 .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}.gallery img{width:100%;height:210px;object-fit:cover;border-radius:14px;border:1px solid rgba(210,220,229,.98);box-shadow:0 9px 24px rgba(38,60,80,.08)}.photo-credit{font-size:10px;color:#7c8c99;margin:8px 2px 0;text-align:right}.footer{text-align:center;color:var(--muted);font-size:12px;padding:30px 0 34px}.footer strong{color:var(--text)}
 @media(max-width:820px){.vehicle-buttons,.benefits{grid-template-columns:1fr 1fr}.story-grid{grid-template-columns:1fr}.story-photo{min-height:280px}.gallery{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}.card{padding:17px}}
 @media(max-width:500px){.vehicle-buttons,.benefits,.grid,.gallery,.history-points{grid-template-columns:1fr}.wrap{width:min(100% - 20px,980px)}.main{padding-top:10px}.vehicle-btn{min-height:78px}.story-copy{padding:20px}.gallery img{height:260px}.page-bg{background-position:center top}}
+.voucher h2{margin:0;color:var(--green-dark)}
+.voucher dl{display:grid;grid-template-columns:max-content 1fr;gap:8px 16px}
+.voucher dt{font-weight:800}.voucher dd{margin:0;overflow-wrap:anywhere}
+.voucher .btn{display:inline-block;width:auto;text-decoration:none;margin-top:8px}
+@media print{
+ .page-bg,.intro,#searchCard,#customerCard,.benefits,.story,.gallery,.photo-credit,.footer,.voucher .btn{display:none!important}
+ .header{position:static;background:white}.voucher{box-shadow:none;border:0;padding:0}
+}
 </style>
 </head>
 <body>
@@ -37,6 +46,14 @@
 <main class="main"><div class="wrap">
 <section class="intro"><h1>Reserva tu plaza</h1><p>Selecciona el tipo de plaza, indica tu entrada y duración y te mostraremos el precio disponible.</p></section>
 
+<div id="paymentNotice" class="msg" role="status"></div>
+<section id="voucherCard" class="card voucher hidden" aria-labelledby="voucherHeading" tabindex="-1">
+<h2 id="voucherHeading">Reserva confirmada</h2>
+<p>Presenta este justificante al llegar a Parking Las Delicias, calle Don Rodrigo, 3, Málaga.</p>
+<dl id="voucherDetails"></dl>
+<button type="button" class="btn" onclick="window.print()">Imprimir justificante</button>
+<a id="voucherDownload" class="btn" download>Descargar PDF</a>
+</section>
 <section class="card" id="searchCard">
 <div class="vehicle-buttons" id="vehicleButtons">
 <div class="vehicle-option">
@@ -68,7 +85,6 @@
 </div>
 <button id="quoteBtn" class="btn" onclick="quoteBooking()"><i class="fa-solid fa-magnifying-glass"></i> CONSULTAR DISPONIBILIDAD Y PRECIO</button>
 <div id="quoteBox"></div>
-<div id="paymentNotice" role="status"></div>
 </section>
 
 <section class="card hidden" id="customerCard">
@@ -144,6 +160,23 @@ async function createBooking(){
   bookBtn.disabled=false;
  }
 }
+function showVoucher(voucher, pdf) {
+ const fields = [['Referencia',voucher.reference],['Titular',voucher.name],
+  ['Entrada',voucher.entry],['Salida prevista',voucher.exit],['Importe pagado',voucher.amount]];
+ if(voucher.plate) fields.push(['Matrícula',voucher.plate]);
+ document.getElementById('voucherDetails').innerHTML = fields
+  .map(([label,value]) => '<dt>'+label+'</dt><dd>'+esc(value)+'</dd>').join('');
+ const file = Uint8Array.from(atob(pdf), character => character.charCodeAt(0));
+ const download = document.getElementById('voucherDownload');
+ download.href = URL.createObjectURL(new Blob([file],{type:'application/pdf'}));
+ download.download = 'Reserva-' + voucher.reference + '.pdf';
+ document.getElementById('searchCard').classList.add('hidden');
+ document.querySelector('.intro').classList.add('hidden');
+ paymentNotice.textContent = '';
+ const card = document.getElementById('voucherCard');
+ card.classList.remove('hidden');
+ card.focus();
+}
 async function showPaymentResult(){
  const sessionId=new URLSearchParams(location.search).get('pago');
  if(!sessionId)return;
@@ -153,7 +186,11 @@ async function showPaymentResult(){
  for(let attempt=0;attempt<6;attempt++){
   try{
    const result=await postFn('public-booking',{action:'status',sessionId});
-   if(result.paid){paymentNotice.textContent='Pago confirmado. Referencia de reserva: '+result.reference;return;}
+   if(result.paid){
+    if(result.voucher && result.pdf) showVoucher(result.voucher,result.pdf);
+    else paymentNotice.textContent='Reserva confirmada. Referencia: '+result.reference;
+    return;
+   }
   }catch{}
   await new Promise(resolve=>setTimeout(resolve,1500));
  }
