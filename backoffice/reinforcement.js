@@ -76,7 +76,8 @@ function resetReinforcementStayForm(){
  const defaultType=types.find(t=>String(t.code||'').toUpperCase()==='XL')||types.find(t=>/\bXL\b|COCHERA/i.test(String(t.name||'')));
  if(defaultType)reEl('type').value=String(defaultType.id);
  reEl('days').value='1';
- for(const id of ['stayPlate','model','name','staySpot'])reEl(id).value='';
+ for(const id of ['stayPlate','plate','model','name','staySpot'])reEl(id).value='';
+ const commonWarning=reEl('plateWarning');if(commonWarning)commonWarning.textContent='';
  const warning=reEl('stayPlateWarning');if(warning)warning.textContent='';
  refreshReinforcementStayDates();
 }
@@ -101,7 +102,7 @@ async function enter() {
     resetReinforcementStayForm();
     reEl('login').classList.add('hidden');
     reEl('work').classList.remove('hidden');
-    tab('rotation');
+    tab('choose');
     reShowMessage('Acceso temporal activo. Las operaciones quedan registradas sin cobro.', false);
     recoverReinforcementPrinter();
   } catch (error) {
@@ -111,10 +112,11 @@ async function enter() {
   }
 }
 function tab(name) {
-  if(name==='stay'){refreshReinforcementStayDates();reloadReinforcementStaySpots().catch(e=>reShowMessage(e.message,true));}
+  if(name==='stay'){reEl('stayPlate').value=reEl('plate').value;refreshReinforcementStayDates();reloadReinforcementStaySpots().catch(e=>reShowMessage(e.message,true));}
   reEl('rotation').classList.toggle('hidden', name !== 'rotation');
   reEl('stay').classList.toggle('hidden', name !== 'stay');
-  const plate=reEl(name==='stay'?'stayPlate':'plate');plate.focus();plate.select();
+  if(name==='choose'||!reEl('plate').value.trim())reEl('plate').focus();
+  else reEl(name==='stay'?'model':'tariff').focus();
 }
 async function printReinforcementTicket(ticket) {
  lastReinforcementTicket=ticket;
@@ -169,6 +171,7 @@ reEl('days').addEventListener('change',()=>refreshReinforcementStayDates());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!reEl('stayButton').disabled)refreshReinforcementStayDates();});
 setInterval(()=>{if(!document.hidden&&!reEl('stay').classList.contains('hidden')&&!reEl('stayButton').disabled)refreshReinforcementStayDates();},1000);
 async function createStay() {
+  reEl('stayPlate').value=reEl('plate').value;
   const button = reEl('stayButton');
   if (button.disabled) return;
   const entry = refreshReinforcementStayDates();
@@ -210,7 +213,7 @@ document.addEventListener('input',normalizeReinforcementText,true);document.addE
 
 /* Mobile Refuerzo prints through the office PC; desktop Refuerzo remains local. */
 window.parkingQzRemoteHost=/Android|iPhone|iPad/i.test(navigator.userAgent)?'192.168.1.50':null;
-(function mountReinforcementPrinting(){const panel=document.createElement('details');panel.className='panel';panel.id='reinforcementPrinting';panel.innerHTML='<summary style="font-weight:bold;cursor:pointer">Configurar impresión en oficina</summary><p id="reinforcementPrinterTarget"></p><p>Después de guardar la autorización, pulsa Comprobar conexión. Mantén la tablet en la Wi-Fi del parking y QZ Tray abierto en el ordenador. La petición Allow puede aparecer en la pantalla del ordenador.</p><button type="button" onclick="showParkingQzSetup()">Autorizar este dispositivo</button><button type="button" id="reinforcementPrinterCheck" onclick="checkReinforcementPrinter()">Comprobar conexión</button><button type="button" onclick="testReinforcementPrinter()">Imprimir ticket de prueba</button><p><a id="reinforcementQzAddress" target="_blank" rel="noopener">Abrir conexión del ordenador</a></p><p id="reinforcementPrinterStatus" role="status"></p>';document.querySelector('#work .tabs').after(panel);reEl('reinforcementPrinterTarget').textContent='Impresora: '+PARKING_PRINTERS.ticket+' · QZ: '+(window.parkingQzRemoteHost||'este ordenador');const address=reEl('reinforcementQzAddress');address.href='https://'+(window.parkingQzRemoteHost||'localhost')+':8181/';address.hidden=!window.parkingQzRemoteHost})();
+(function mountReinforcementPrinting(){const panel=document.createElement('details');panel.className='panel';panel.id='reinforcementPrinting';panel.innerHTML='<summary style="font-weight:bold;cursor:pointer">Configurar impresión en oficina</summary><p id="reinforcementPrinterTarget"></p><p>Después de guardar la autorización, pulsa Comprobar conexión. Mantén la tablet en la Wi-Fi del parking y QZ Tray abierto en el ordenador. La petición Allow puede aparecer en la pantalla del ordenador.</p><button type="button" onclick="showParkingQzSetup()">Autorizar este dispositivo</button><button type="button" id="reinforcementPrinterCheck" onclick="checkReinforcementPrinter()">Comprobar conexión</button><button type="button" onclick="testReinforcementPrinter()">Imprimir ticket de prueba</button><p><a id="reinforcementQzAddress" target="_blank" rel="noopener">Abrir conexión del ordenador</a></p><p id="reinforcementPrinterStatus" role="status"></p>';document.querySelector('#work').append(panel);reEl('reinforcementPrinterTarget').textContent='Impresora: '+PARKING_PRINTERS.ticket+' · QZ: '+(window.parkingQzRemoteHost||'este ordenador');const address=reEl('reinforcementQzAddress');address.href='https://'+(window.parkingQzRemoteHost||'localhost')+':8181/';address.hidden=!window.parkingQzRemoteHost})();
 let reinforcementPrinterCheckBusy=false;
 async function checkReinforcementPrinter(){
  if(reinforcementPrinterCheckBusy)return;reinforcementPrinterCheckBusy=true;
@@ -349,9 +352,9 @@ async function checkReinforcementPlate(id,notify=false){
   return !!data.blocked;
  }catch(error){warning.textContent='No se pudo comprobar la matrícula: '+error.message;if(notify)throw error;return true;}
 }
-for(const id of ['plate','stayPlate']){
- reEl(id).addEventListener('input',()=>{if(reEl(id+'Warning'))reEl(id+'Warning').textContent='';clearTimeout(reinforcementPlateTimers.get(id));reinforcementPlateTimers.set(id,setTimeout(()=>checkReinforcementPlate(id),300));});
- reEl(id).addEventListener('change',()=>checkReinforcementPlate(id));
+for(const id of ['plate']){
+ reEl(id).addEventListener('input',()=>{reEl('stayPlate').value=reEl('plate').value;if(reEl(id+'Warning'))reEl(id+'Warning').textContent='';clearTimeout(reinforcementPlateTimers.get(id));reinforcementPlateTimers.set(id,setTimeout(()=>checkReinforcementPlate(id),300));});
+ reEl(id).addEventListener('change',()=>{reEl('stayPlate').value=reEl('plate').value;checkReinforcementPlate(id)});
 }
 function withReinforcementPlateCheck(previous,id,buttonId){
  return async function(...args){
@@ -362,4 +365,4 @@ function withReinforcementPlateCheck(previous,id,buttonId){
  };
 }
 rotationEntry=withReinforcementPlateCheck(rotationEntry,'plate','enterButton');
-createStay=withReinforcementPlateCheck(createStay,'stayPlate','stayButton');
+createStay=withReinforcementPlateCheck(createStay,'plate','stayButton');
