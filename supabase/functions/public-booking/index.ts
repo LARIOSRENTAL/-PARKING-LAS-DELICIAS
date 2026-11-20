@@ -1,5 +1,7 @@
 import {createClient} from "npm:@supabase/supabase-js@2.118.0";
 
+import {PDFDocument, StandardFonts, rgb} from "npm:pdf-lib@1.17.1";
+
 const site = "https://parkinglasdelicias.com/";
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +43,141 @@ async function validSignature(body: string, header: string, secret: string) {
   return false;
 }
 
+const office = "oficina@parkinglasdelicias.com";
+const voucherFields = "id,reference,amount_eur,entry_at,exit_at,customer_name,customer_email,plate,status,payment_status,stripe_payment_intent_id,web_voucher_customer_message_id,web_voucher_office_message_id";
+type VoucherBooking = {
+  id: string;
+  reference: string;
+  amount_eur: number | string;
+  entry_at: string;
+  exit_at: string;
+  customer_name: string;
+  customer_email: string;
+  plate: string | null;
+  status: string;
+  payment_status: string;
+  stripe_payment_intent_id: string | null;
+  web_voucher_customer_message_id: string | null;
+  web_voucher_office_message_id: string | null;
+};
+type BookingDb = ReturnType<typeof createClient>;
+type CheckoutPayment = {
+  id: string;
+  livemode: boolean;
+  status: string;
+  payment_status: string;
+  mode: string;
+  currency: string;
+  amount_total: number;
+  payment_intent: string;
+  metadata: {parking_reservation?: string} | null;
+};
+
+async function findBooking(db: BookingDb, sessionId: string): Promise<VoucherBooking | null> {
+  const {data, error} = await db.from("reservations").select(voucherFields)
+    .eq("source", "web").eq("stripe_checkout_session_id", sessionId).maybeSingle();
+  if (error) throw error;
+  return data as VoucherBooking | null;
+}
+
+async function confirmPayment(db: BookingDb, row: VoucherBooking, session: CheckoutPayment) {
+  if (!session.livemode || session.status !== "complete" || session.payment_status !== "paid" ||
+      session.mode !== "payment" || session.currency !== "eur" || !/^pi_[A-Za-z0-9]+$/.test(session.payment_intent) ||
+      session.metadata?.parking_reservation !== row.id || Math.round(Number(row.amount_eur) * 100) !== session.amount_total) {
+    return null;
+  }
+  if (row.payment_status === "paid") return row.stripe_payment_intent_id === session.payment_intent ? row : null;
+  if (row.status !== "pending_payment" || row.payment_status !== "pending") return null;
+  const {error} = await db.from("reservations").update({status:"confirmed", payment_status:"paid",
+    payment_method:"online", stripe_payment_intent_id:session.payment_intent, expires_at:null})
+    .eq("id", row.id).eq("stripe_checkout_session_id", session.id).eq("status","pending_payment").eq("payment_status","pending");
+  if (error) throw error;
+  const updated = await findBooking(db, session.id);
+  return updated?.payment_status === "paid" && updated.stripe_payment_intent_id === session.payment_intent ? updated : null;
+}
+
+const bookingDate = new Intl.DateTimeFormat("es-ES", {timeZone:"Europe/Madrid", dateStyle:"short", timeStyle:"short"});
+const bookingAmount = new Intl.NumberFormat("es-ES", {style:"currency", currency:"EUR"});
+
+function voucherDetails(row: VoucherBooking) {
+  return {
+    reference:row.reference, name:row.customer_name, plate:row.plate,
+    entry:bookingDate.format(new Date(row.entry_at)), exit:bookingDate.format(new Date(row.exit_at)),
+    amount:bookingAmount.format(Number(row.amount_eur)),
+  };
+}
+
+async function voucherPdf(row: VoucherBooking) {
+  const details = voucherDetails(row);
+  const pdf = await PDFDocument.create();
+  pdf.setCreationDate(new Date(row.entry_at));
+  pdf.setModificationDate(new Date(row.entry_at));
+  const page = pdf.addPage([595, 420]);
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const navy = rgb(.07, .19, .28);
+  const green = rgb(.05, .43, .27);
+  const png = await fetch(site + "backoffice/assets/logo-las-delicias.png", {signal:AbortSignal.timeout(5000)})
+    .then(response => response.ok ? response.arrayBuffer() : null).catch(() => null);
+  if (png) {
+    const logo = await pdf.embedPng(png);
+    const size = logo.scaleToFit(190, 55);
+    page.drawImage(logo, {x:42,y:343,width:size.width,height:size.height});
+  }
+  const printable = (value: string) => Array.from(value.normalize("NFC"), char => {
+    try { regular.encodeText(char); return char; } catch { return "?"; }
+  }).join("");
+  page.drawText("Justificante de reserva", {x:42,y:305,size:24,font:bold,color:navy});
+  page.drawText("Reserva confirmada · " + details.reference, {x:42,y:273,size:16,font:bold,color:green});
+  const lines = [
+    "Titular: " + details.name, "Entrada: " + details.entry, "Salida prevista: " + details.exit,
+    ...(details.plate ? ["Matrícula: " + details.plate] : []), "Importe pagado: " + details.amount,
+    "Parking Las Delicias · C. Don Rodrigo, 3 · Málaga",
+    "Presenta este justificante al llegar al parking.",
+  ];
+  for (const [index, line] of lines.entries()) {
+    page.drawText(printable(line), {x:42,y:237-index*25,size:12,font:regular,color:navy,lineHeight:14,maxWidth:510});
+  }
+  return pdf.saveAsBase64();
+}
+
+async function sendVouchers(db: BookingDb, row: VoucherBooking, pdf: string) {
+  const apiKey = Deno.env.get("INVOICE_RESEND_API_KEY");
+  const deliveries = [
+    {column:"web_voucher_customer_message_id",to:row.customer_email,kind:"customer"},
+    {column:"web_voucher_office_message_id",to:office,kind:"office"},
+  ] as const;
+  const results = await Promise.allSettled(deliveries.filter(item => !row[item.column]).map(async item => {
+    if (!apiKey || !item.to) throw new Error("Correo de reserva sin configurar: " + item.kind);
+    const response = await fetch("https://api.resend.com/emails", {
+      method:"POST", signal:AbortSignal.timeout(7000),
+      headers:{Authorization:"Bearer " + apiKey,"Content-Type":"application/json",
+        "Idempotency-Key":"parking-voucher-" + row.id + "-" + item.kind},
+      body:JSON.stringify({
+        from:"Parking Las Delicias <" + office + ">", to:[item.to], reply_to:office,
+        subject:"Reserva confirmada " + row.reference + " · Parking Las Delicias",
+        text:"Reserva " + row.reference + " confirmada para " + row.customer_name + ".\nEntrada: " +
+          bookingDate.format(new Date(row.entry_at)) + "\nSalida prevista: " + bookingDate.format(new Date(row.exit_at)) +
+          "\nImporte pagado: " + bookingAmount.format(Number(row.amount_eur)) + "\n\nAdjuntamos el justificante de la reserva.",
+        attachments:[{filename:"Reserva-" + row.reference + ".pdf",content:pdf}],
+      }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.id) throw new Error("Resend justificante " + item.kind + " HTTP " + response.status);
+    const {error} = await db.from("reservations").update({[item.column]:result.id}).eq("id", row.id).is(item.column,null);
+    if (error) throw new Error("No se pudo registrar el envío del justificante: " + item.kind);
+  }));
+  for (const result of results) {
+    if (result.status === "rejected") throw result.reason;
+  }
+}
+
+function sendVouchersInBackground(db: BookingDb, row: VoucherBooking, pdf: string) {
+  const task = sendVouchers(db,row,pdf).catch(error => console.error("Parking justificante:",error.message));
+  const runtime = (globalThis as typeof globalThis & {EdgeRuntime?: {waitUntil(task:Promise<void>):void}}).EdgeRuntime;
+  runtime?.waitUntil(task);
+}
+
 Deno.serve(async req => {
   const key = Deno.env.get("PARKING_STRIPE_SECRET_KEY");
   const signingSecret = Deno.env.get("PARKING_STRIPE_WEBHOOK_SECRET");
@@ -67,31 +204,31 @@ Deno.serve(async req => {
         if (error) throw error;
         return json({received:true});
       }
-      if (event.type !== "checkout.session.completed" || session.payment_status !== "paid" ||
-          session.mode !== "payment" || session.currency !== "eur" || typeof session.payment_intent !== "string") {
-        return json({received:true});
+      if (!["checkout.session.completed","checkout.session.async_payment_succeeded"].includes(event.type) ||
+          session.payment_status !== "paid") return json({received:true});
+      const row = await findBooking(db, session.id);
+      const confirmed = row && await confirmPayment(db, row, session);
+      if (!confirmed) return json({error:"Pago sin correspondencia o reserva requiere revisión"},409);
+      if (!confirmed.web_voucher_customer_message_id || !confirmed.web_voucher_office_message_id) {
+        await sendVouchers(db,confirmed,await voucherPdf(confirmed));
       }
-      const {data:row,error:readError} = await db.from("reservations")
-        .select("amount_eur,status,payment_status,stripe_payment_intent_id")
-        .eq("id",hold).eq("source","web").eq("stripe_checkout_session_id",session.id).maybeSingle();
-      if (readError) throw readError;
-      if (!row || Math.round(Number(row.amount_eur)*100) !== session.amount_total) return json({error:"Pago sin correspondencia"},409);
-      if (row.payment_status === "paid" && row.stripe_payment_intent_id === session.payment_intent) return json({received:true});
-      if (row.status !== "pending_payment") return json({error:"La reserva requiere revisión"},409);
-      const {error} = await db.from("reservations").update({status:"confirmed",payment_status:"paid",
-        payment_method:"online",stripe_payment_intent_id:session.payment_intent,expires_at:null})
-        .eq("id",hold).eq("stripe_checkout_session_id",session.id).eq("status","pending_payment").eq("payment_status","pending");
-      if (error) throw error;
       return json({received:true});
     }
 
     const body = await req.json();
     if (body.action === "status") {
       if (typeof body.sessionId !== "string" || !/^cs_live_[A-Za-z0-9]+$/.test(body.sessionId)) return json({error:"Sesión no válida"},400);
-      const {data,error} = await db.from("reservations").select("reference,payment_status")
-        .eq("source","web").eq("stripe_checkout_session_id",body.sessionId).maybeSingle();
-      if (error) throw error;
-      return data?.payment_status === "paid" ? json({paid:true,reference:data.reference}) : json({paid:false});
+      let row = await findBooking(db, body.sessionId);
+      if (!row) return json({paid:false});
+      if (row.status === "pending_payment" && row.payment_status === "pending" && key) {
+        const session = await stripe("checkout/sessions/" + body.sessionId,key);
+        if (session.id !== body.sessionId) return json({paid:false});
+        row = await confirmPayment(db,row,session);
+      }
+      if (!row || row.payment_status !== "paid") return json({paid:false});
+      const pdf = await voucherPdf(row);
+      sendVouchersInBackground(db,row,pdf);
+      return json({paid:true,reference:row.reference,voucher:voucherDetails(row),pdf});
     }
     if (!ready || !key) return json({error:"El pago online todavía no está disponible. No se ha creado ninguna reserva."},503);
     const vehicle = String(body.vehicleType || "").toUpperCase();
