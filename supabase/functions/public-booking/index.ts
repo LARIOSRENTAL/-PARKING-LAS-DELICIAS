@@ -16,7 +16,14 @@ async function stripe(path: string, key: string, params?: URLSearchParams, idemp
   const response = await fetch("https://api.stripe.com/v1/" + path, {
     method: params ? "POST" : "GET", headers, body: params, signal: AbortSignal.timeout(12000),
   });
-  if (!response.ok) throw new Error("Stripe HTTP " + response.status);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const fields = [payload?.error?.type, payload?.error?.code, payload?.error?.param]
+      .filter(value => typeof value === "string" && /^[a-zA-Z0-9_\[\].-]{1,100}$/.test(value));
+    const requestId = response.headers.get("request-id");
+    if (requestId && /^req_[a-zA-Z0-9]+$/.test(requestId)) fields.push(requestId);
+    throw new Error("Stripe HTTP " + response.status + " " + fields.join(" "));
+  }
   return response.json();
 }
 
@@ -130,7 +137,7 @@ Deno.serve(async req => {
     let session;
     try {
       const params = new URLSearchParams({
-        mode:"payment", "payment_method_types[0]":"card", locale:"es", "customer_email":email,
+        mode:"payment", locale:"es", "customer_email":email,
         "line_items[0][price_data][currency]":"eur","line_items[0][price_data][unit_amount]":String(cents),
         "line_items[0][price_data][product_data][name]":"Parking Las Delicias · "+vehicle+" · "+days+" día(s)",
         "line_items[0][quantity]":"1","metadata[parking_reservation]":hold.id,expires_at:String(expires),
