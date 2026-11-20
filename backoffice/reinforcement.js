@@ -103,6 +103,7 @@ async function enter() {
     reEl('work').classList.remove('hidden');
     tab('rotation');
     reShowMessage('Acceso temporal activo. Las operaciones quedan registradas sin cobro.', false);
+    recoverReinforcementPrinter();
   } catch (error) {
     reEl('loginError').textContent = error.message || 'Código no válido o caducado.';
   } finally {
@@ -218,6 +219,43 @@ async function checkReinforcementPrinter(){
  catch(e){status.textContent='No se pudo conectar: '+e.message}
  finally{reinforcementPrinterCheckBusy=false;button.disabled=false}
 }
+
+/* Auto-recover the office printer connection for Refuerzo only.
+   Never reprint a job automatically, and never prompt for credentials in background. */
+const reinforcementQzAutoRecovery={busy:false,failures:0,nextAttempt:0};
+async function recoverReinforcementPrinter(){
+ if(!reinforcementCode||document.hidden||reinforcementQzAutoRecovery.busy||reinforcementPrinterCheckBusy||reinforcementPrintTestBusy)return;
+ if(!window.parkingQzRemoteHost||!navigator.onLine)return;
+ if(!window.qz?.websocket||!window.qz?.printers)return;
+ if(qz.websocket.isActive()){reinforcementQzAutoRecovery.failures=0;reinforcementQzAutoRecovery.nextAttempt=0;return;}
+ if(Date.now()<reinforcementQzAutoRecovery.nextAttempt)return;
+ reinforcementQzAutoRecovery.busy=true;
+ const status=reEl('reinforcementPrinterStatus');
+ try{
+  // No implicit setup modal, and no re-import of private keys.
+  if(!parkingQzIdentity){
+   const saved=await parkingQzIdentityStore('readonly');
+   if(!saved)return;
+  }
+  status.textContent='Conexión de impresión interrumpida. Recuperando automáticamente…';
+  await connectParkingQz();
+  const printer=PARKING_PRINTERS.ticket;
+  const found=await parkingQzWithTimeout(qz.printers.find(printer),'La impresora no responde.',10000);
+  if(!(Array.isArray(found)?found.includes(printer):found===printer))throw Error('No se encuentra '+printer);
+  reinforcementQzAutoRecovery.failures=0;
+  reinforcementQzAutoRecovery.nextAttempt=0;
+  status.textContent='Conexión recuperada automáticamente. Impresora '+printer+' disponible.';
+ }catch(e){
+  reinforcementQzAutoRecovery.failures++;
+  const seconds=Math.min(60,5*Math.pow(2,Math.min(reinforcementQzAutoRecovery.failures-1,4)));
+  reinforcementQzAutoRecovery.nextAttempt=Date.now()+seconds*1000;
+  status.textContent='Impresión desconectada. Se intentará recuperar automáticamente. Si continúa el problema, pulsa Comprobar conexión. '+(e.message||e);
+ }finally{reinforcementQzAutoRecovery.busy=false;}
+}
+setInterval(recoverReinforcementPrinter,15000);
+window.addEventListener('online',recoverReinforcementPrinter);
+window.addEventListener('focus',recoverReinforcementPrinter);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)recoverReinforcementPrinter();});
 
 let reinforcementPrintTestBusy=false;
 async function testReinforcementPrinter(){if(reinforcementPrintTestBusy)return;reinforcementPrintTestBusy=true;const status=reEl('reinforcementPrinterStatus');try{await sendParkingPrint('ticket',parkingTicketShell('Prueba de impresión Refuerzo','<h2 class="center">PRUEBA DE IMPRESIÓN</h2><p class="center"><b>REFUERZO · LAS DELICIAS</b></p><p class="center">'+reEscape(new Date().toLocaleString('es-ES'))+'</p><p class="center">No registra entradas ni cobros.</p>',100),true);status.textContent='Ticket de prueba enviado a la BIXOLON. Comprueba la salida en papel.'}catch(e){status.textContent='No se imprimió la prueba: '+e.message}finally{reinforcementPrintTestBusy=false}}
