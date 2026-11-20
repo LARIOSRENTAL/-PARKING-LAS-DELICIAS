@@ -57,7 +57,7 @@ let stayTicketReportRows=[];
 function stayTickets(){
  const privileged=['admin','manager'].includes(currentProfile?.role),range=rotationCurrentMonth(),today=range.today;
  historyTitle.textContent='Tickets emitidos · Estancias';
- historyBody.innerHTML='<div class="panel"><div class="grid2"><div class="field"><label for="stayTicketDateFrom">Desde</label><input type="date" id="stayTicketDateFrom" value="'+today+'" '+(privileged?'':'min="'+range.first+'" max="'+range.last+'"')+'></div><div class="field"><label for="stayTicketDateTo">Hasta</label><input type="date" id="stayTicketDateTo" value="'+today+'" '+(privileged?'':'min="'+range.first+'" max="'+range.last+'"')+'></div></div><button class="mini blue" type="button" onclick="loadStayTicketReport()">Buscar tickets</button><div id="stayTicketReportResults"></div></div>';
+ historyBody.innerHTML='<div class="panel"><div class="grid2"><div class="field"><label for="stayTicketDateFrom">Desde</label><input type="date" id="stayTicketDateFrom" value="'+today+'" '+(privileged?'':'min="'+range.first+'" max="'+range.last+'"')+'></div><div class="field"><label for="stayTicketDateTo">Hasta</label><input type="date" id="stayTicketDateTo" value="'+today+'" '+(privileged?'':'min="'+range.first+'" max="'+range.last+'"')+'></div></div><div class="field"><label for="stayTicketSearch">Buscar por número de referencia o matrícula</label><input type="search" id="stayTicketSearch" autocomplete="off" placeholder="Referencia o matrícula" oninput="renderStayTicketReport()"></div><button class="mini blue" type="button" onclick="loadStayTicketReport()">Buscar tickets</button><div id="stayTicketReportResults"></div></div>';
  historyModal.classList.remove('hidden');
  loadStayTicketReport();
 }
@@ -66,6 +66,14 @@ function stayTicketLocalDate(stamp){
  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(stamp));
  const value=type=>parts.find(p=>p.type===type)?.value||'';
  return value('year')+'-'+value('month')+'-'+value('day');
+}
+function renderStayTicketReport(){
+ const el=opsEl('stayTicketReportResults');if(!el)return;
+ const query=String(opsEl('stayTicketSearch')?.value||'').trim().toUpperCase();
+ const rows=stayTicketReportRows.filter(x=>!query||String(x.reference||'').toUpperCase().includes(query)||String(x.plate||'').toUpperCase().includes(query));
+ if(!stayTicketReportRows.length){el.innerHTML='<div class="muted">No hay estancias finalizadas en esas fechas.</div>';return}
+ if(!rows.length){el.innerHTML='<div class="muted">No se encontraron estancias para esa referencia o matrícula.</div>';return}
+ el.innerHTML='<p>'+rows.length+' de '+stayTicketReportRows.length+' estancia(s). Puedes emitir documentos de pagos registrados sin repetir el cobro.</p><div class="tableWrap"><table class="tbl"><thead><tr><th>Referencia</th><th>Matrícula</th><th>Cliente</th><th>Finalizada</th><th>Importe estancia</th><th>Documentos</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.reference||'—')+'</td><td><b>'+esc(x.plate||'—')+'</b><br>'+esc(x.vehicle_make_model||'')+'</td><td>'+esc(x.customer_name||'—')+'</td><td>'+fmt(x.finished_at||x.updated_at)+'</td><td>'+money(x.amount_eur||0)+'</td><td><button class="mini blue" type="button" onclick="loadStayTicketPayments(\''+esc(x.id)+'\')">Tickets / facturas</button><div id="stayTicketPayments_'+esc(x.id)+'" class="stayTicketPayments hidden"></div></td></tr>').join('')+'</tbody></table></div>';
 }
 async function loadStayTicketReport(){
  const privileged=['admin','manager'].includes(currentProfile?.role),range=rotationCurrentMonth();
@@ -76,11 +84,10 @@ async function loadStayTicketReport(){
  if(!privileged&&(from<range.first||to>range.last))return alert('Puedes consultar tickets únicamente del mes vigente.');
  el.textContent='Consultando estancias finalizadas…';
  try{
-  const result=await db.from('reservations').select('id,reference,control_reference,plate,customer_name,customer_phone,vehicle_make_model,amount_eur,finished_at,updated_at,status').eq('status','completed').order('finished_at',{ascending:false,nullsFirst:false}).limit(5000);
+  const result=await db.from('reservations').select('id,reference,plate,customer_name,customer_phone,vehicle_make_model,amount_eur,finished_at,updated_at,status').eq('status','completed').order('finished_at',{ascending:false,nullsFirst:false}).limit(5000);
   if(result.error)throw result.error;
   stayTicketReportRows=(result.data||[]).filter(x=>{const date=stayTicketLocalDate(x.finished_at||x.updated_at);return date&&date>=from&&date<=to&&(privileged||rotationCurrentMonthContains(x.finished_at||x.updated_at))});
-  if(!stayTicketReportRows.length){el.innerHTML='<div class="muted">No hay estancias finalizadas en esas fechas.</div>';return}
-  el.innerHTML='<p>'+stayTicketReportRows.length+' estancia(s) finalizada(s). Puedes emitir documentos de pagos registrados sin repetir el cobro.</p><div class="tableWrap"><table class="tbl"><thead><tr><th>Estancia</th><th>Matrícula</th><th>Cliente</th><th>Finalizada</th><th>Importe estancia</th><th>Documentos</th></tr></thead><tbody>'+stayTicketReportRows.map(x=>'<tr><td>'+esc(x.control_reference||x.reference||'—')+'</td><td><b>'+esc(x.plate||'—')+'</b><br>'+esc(x.vehicle_make_model||'')+'</td><td>'+esc(x.customer_name||'—')+'</td><td>'+fmt(x.finished_at||x.updated_at)+'</td><td>'+money(x.amount_eur||0)+'</td><td><button class="mini blue" type="button" onclick="loadStayTicketPayments(\''+esc(x.id)+'\')">Tickets / facturas</button><div id="stayTicketPayments_'+esc(x.id)+'" class="stayTicketPayments hidden"></div></td></tr>').join('')+'</tbody></table></div>';
+  renderStayTicketReport();
  }catch(e){el.textContent='No se pudieron cargar las estancias finalizadas: '+e.message}
 }
 async function loadStayTicketPayments(id){
