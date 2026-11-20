@@ -1,6 +1,6 @@
 import {createClient} from "npm:@supabase/supabase-js@2.118.0";
 
-import {PDFDocument, StandardFonts, rgb} from "npm:pdf-lib@1.17.1";
+import {PDFDocument, StandardFonts, rgb, breakTextIntoLines} from "npm:pdf-lib@1.17.1";
 
 const site = "https://parkinglasdelicias.com/";
 const cors = {
@@ -113,35 +113,83 @@ function voucherDetails(row: VoucherBooking) {
 }
 
 async function voucherPdf(row: VoucherBooking) {
-  const details = voucherDetails(row);
+  const {heading,intro,sections} = voucherContent(row);
   const pdf = await PDFDocument.create();
   pdf.setCreationDate(new Date(row.entry_at));
   pdf.setModificationDate(new Date(row.entry_at));
-  const page = pdf.addPage([595, 420]);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const navy = rgb(.07, .19, .28);
   const green = rgb(.05, .43, .27);
-  const png = await fetch(site + "backoffice/assets/logo-las-delicias.png", {signal:AbortSignal.timeout(5000)})
+  const divider = rgb(.84, .88, .92);
+  const width = 595;
+  const height = 842;
+  const margin = 44;
+  const innerWidth = width - 2 * margin;
+  let page = pdf.addPage([width,height]);
+  let y = height - margin;
+  const png = await fetch(logoUrl, {signal:AbortSignal.timeout(5000)})
     .then(response => response.ok ? response.arrayBuffer() : null).catch(() => null);
   if (png) {
     const logo = await pdf.embedPng(png);
-    const size = logo.scaleToFit(190, 55);
-    page.drawImage(logo, {x:42,y:343,width:size.width,height:size.height});
+    const size = logo.scaleToFit(190,55);
+    page.drawImage(logo,{x:margin,y:y-size.height,width:size.width,height:size.height});
+    y -= size.height + 28;
   }
+
   const printable = (value: string) => Array.from(value.normalize("NFC"), char => {
     try { regular.encodeText(char); return char; } catch { return "?"; }
   }).join("");
-  page.drawText("Justificante de reserva", {x:42,y:305,size:24,font:bold,color:navy});
-  page.drawText("Reserva confirmada · " + details.reference, {x:42,y:273,size:16,font:bold,color:green});
-  const lines = [
-    "Titular: " + details.name, "Entrada: " + details.entry, "Salida prevista: " + details.exit,
-    ...(details.plate ? ["Matrícula: " + details.plate] : []), "Importe pagado: " + details.amount,
-    "Parking Las Delicias · C. Don Rodrigo, 3 · Málaga",
-    "Presenta este justificante al llegar al parking.",
-  ];
-  for (const [index, line] of lines.entries()) {
-    page.drawText(printable(line), {x:42,y:237-index*25,size:12,font:regular,color:navy,lineHeight:14,maxWidth:510});
+
+  const size = 11;
+  const leading = 16;
+  function wrap(value: string, available: number) {
+    const measure = (line: string) => regular.widthOfTextAtSize(line,size);
+    const lines = breakTextIntoLines(printable(value).replace(/\s+/g," "),[" ","@","-","."],available,measure);
+    return lines.flatMap(line => {
+      if (measure(line) <= available) return [line];
+      const chunks: string[] = [];
+      let chunk = "";
+      for (const char of line) {
+        if (measure(chunk+char) > available) {
+          chunks.push(chunk);
+          chunk = "";
+        }
+        chunk += char;
+      }
+      chunks.push(chunk);
+      return chunks;
+    });
+  }
+
+  page.drawText(heading,{x:margin,y:y-24,size:26,font:bold,color:green});
+  y -= 49;
+  for (const line of wrap(intro,innerWidth)) {
+    page.drawText(line,{x:margin,y,size,font:regular,color:navy});
+    y -= leading;
+  }
+  y -= 12;
+
+  for (const {title,fields} of sections) {
+    const labelWidth = 140;
+    const rows = fields.map(([label,value]) => ({label,lines:wrap(value,innerWidth-(label ? labelWidth : 0))}));
+    const sectionHeight = 38 + rows.reduce((total,row) => total + row.lines.length*leading + 2,0);
+    if (y-sectionHeight < margin) {
+      page = pdf.addPage([width,height]);
+      y = height - margin;
+    }
+    page.drawText(title,{x:margin,y,size:14,font:bold,color:navy});
+    page.drawLine({start:{x:margin,y:y-7},end:{x:width-margin,y:y-7},thickness:.8,color:divider});
+    y -= 26;
+    for (const {label,lines} of rows) {
+      if (label) page.drawText(label + ":",{x:margin,y,size,font:bold,color:navy});
+      for (const line of lines) {
+        page.drawText(line,{x:margin+(label ? labelWidth : 0),y,size,font:regular,color:navy});
+        y -= leading;
+      }
+      y -= 2;
+    }
+    y -= 12;
   }
   return pdf.saveAsBase64();
 }
@@ -166,7 +214,8 @@ function officialMailLink(value: string | undefined) {
   }
 }
 
-function voucherEmail(row: VoucherBooking, links: {terms?: string; privacy?: string}) {
+function voucherContent(row: VoucherBooking) {
+  const heading = "Reserva confirmada";
   const details = voucherDetails(row);
   const intro = "Hola, " + details.name + ", tu reserva ha sido realizada correctamente, queda poco para que disfrutes de un servicio hecho a tu medida. Mientras tanto, aquí tienes los datos de tu reserva:";
   const vehicle = [
@@ -184,6 +233,11 @@ function voucherEmail(row: VoucherBooking, links: {terms?: string; privacy?: str
     {title:"Estancia", fields:[["",row.duration_days + (row.duration_days === 1 ? " día" : " días") + " - " + details.amount]]},
     {title:"Plaza reservada", fields:[["",space]]},
   ];
+  return {heading,intro,sections};
+}
+
+function voucherEmail(row: VoucherBooking, links: {terms?: string; privacy?: string}) {
+  const {heading,intro,sections} = voucherContent(row);
   const terms = officialMailLink(links.terms);
   const privacy = officialMailLink(links.privacy);
   const termsText = terms ? "Puede consultar todas las condiciones de su reserva en el siguiente enlace: Condiciones generales (" + terms + ")."
@@ -197,9 +251,9 @@ function voucherEmail(row: VoucherBooking, links: {terms?: string; privacy?: str
     : 'Puede solicitar nuestra política de privacidad en ' + mailto + '.';
   const contact = ["Calle Don Rodrigo 3","29008, Málaga (España)","+34 952 212 478",office];
   const text = [
-    "Parking Las Delicias", "Reserva confirmada", intro,
+    "Parking Las Delicias", heading, intro,
     ...sections.map(({title,fields}) => [title, ...fields.map(([label,value]) => label ? label + ": " + value : value)].join("\n")),
-    contact.join("\n"), "Condiciones de la reserva\n" + termsText, "Aviso de confidencialidad\n" + confidentiality,
+    "Parking Las Delicias\n" + contact.join("\n"), "Condiciones de la reserva\n" + termsText, "Aviso de confidencialidad\n" + confidentiality,
     "Aviso de protección de datos de carácter personal\n" + privacyNotice + "\n" + privacyText,
   ].join("\n\n");
   const html = `<!doctype html><html lang="es"><body style="margin:0;background:#eef3f7;color:#153047;font-family:Arial,sans-serif">
@@ -207,11 +261,14 @@ function voucherEmail(row: VoucherBooking, links: {terms?: string; privacy?: str
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #d7e1ea;border-radius:12px">
 <tr><td style="padding:28px;line-height:1.55">
 <img src="cid:parking-las-delicias-logo" width="190" alt="Parking Las Delicias" style="display:block;max-width:100%;height:auto">
-<h1 style="color:#118257;font-size:26px;margin:20px 0 12px">Reserva confirmada</h1>
+<h1 style="color:#118257;font-size:26px;margin:20px 0 12px">${heading}</h1>
 <p>${escapeMailHtml(intro)}</p>
 ${sections.map(({title,fields}) => `<h2 style="font-size:17px;margin:20px 0 6px;border-bottom:1px solid #d7e1ea">${title}</h2>
 <div>${fields.map(([label,value]) => label ? '<strong>' + label + ':</strong> ' + escapeMailHtml(value) : escapeMailHtml(value)).join('<br>')}</div>`).join('')}
-<p style="margin:24px 0">${contact.slice(0,2).join('<br>')}<br><a href="tel:+34952212478">${contact[2]}</a><br>${mailto}</p>
+</td></tr>
+<tr><td style="padding:24px 28px;background:#f6f8fb;border-top:1px solid #d7e1ea;line-height:1.55">
+<img src="cid:parking-las-delicias-logo" width="150" alt="Parking Las Delicias" style="display:block;max-width:100%;height:auto">
+<p style="margin:12px 0 20px">${contact.slice(0,2).join('<br>')}<br><a href="tel:+34952212478">${contact[2]}</a><br>${mailto}</p>
 <div style="font-size:13px">
 <h2 style="font-size:15px">Condiciones de la reserva</h2><p>${termsHtml}</p>
 <h2 style="font-size:15px">Aviso de confidencialidad</h2><p>${confidentiality}</p>
