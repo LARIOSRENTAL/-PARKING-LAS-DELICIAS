@@ -44,15 +44,20 @@ async function validSignature(body: string, header: string, secret: string) {
 }
 
 const office = "oficina@parkinglasdelicias.com";
-const voucherFields = "id,reference,amount_eur,entry_at,exit_at,customer_name,customer_email,plate,status,payment_status,stripe_payment_intent_id,web_voucher_customer_message_id,web_voucher_office_message_id";
+const voucherFields = "id,reference,amount_eur,created_at,entry_at,exit_at,duration_days,customer_name,customer_email,customer_phone,vehicle_make_model,plate,vehicle_type:vehicle_types(code),status,payment_status,stripe_payment_intent_id,web_voucher_customer_message_id,web_voucher_office_message_id";
 type VoucherBooking = {
   id: string;
   reference: string;
   amount_eur: number | string;
+  created_at: string;
+  duration_days: number;
   entry_at: string;
   exit_at: string;
   customer_name: string;
   customer_email: string;
+  customer_phone: string | null;
+  vehicle_make_model: string | null;
+  vehicle_type: {code: string} | null;
   plate: string | null;
   status: string;
   payment_status: string;
@@ -77,7 +82,7 @@ async function findBooking(db: BookingDb, sessionId: string): Promise<VoucherBoo
   const {data, error} = await db.from("reservations").select(voucherFields)
     .eq("source", "web").eq("stripe_checkout_session_id", sessionId).maybeSingle();
   if (error) throw error;
-  return data as VoucherBooking | null;
+  return data as unknown as VoucherBooking | null;
 }
 
 async function confirmPayment(db: BookingDb, row: VoucherBooking, session: CheckoutPayment) {
@@ -141,13 +146,94 @@ async function voucherPdf(row: VoucherBooking) {
   return pdf.saveAsBase64();
 }
 
+const logoUrl = site + "backoffice/assets/logo-las-delicias.png";
+const vehicleLabels: Record<string, string> = {
+  MOTO: "Moto", TURISMO: "Estándar", XL: "XL", XXL: "XXL",
+};
+const reservationDate = new Intl.DateTimeFormat("es-ES", {timeZone:"Europe/Madrid", dateStyle:"long"});
+const confidentiality = "Este correo electrónico y, en su caso, cualquier fichero anexo al mismo, contiene información de carácter confidencial exclusivamente dirigida a su destinatario o destinatarios. Queda prohibida su divulgación, copia o distribución a terceros sin la previa autorización expresa y escrita de su autor. En el caso de haber recibido este correo electrónico por error, se ruega que se notifique inmediatamente esta circunstancia mediante reenvío a la dirección electrónica del remitente. Gracias.";
+const privacyNotice = "En cumplimiento del Reglamento General de Protección de Datos en relación a los datos de carácter personal que haya proporcionado o pueda proporcionar a Aparcamiento Las Delicias Malaga, S.L. o a su personal, le informamos que el responsable del tratamiento es Aparcamiento Las Delicias Malaga, S.L., con domicilio en Calle Don Rodrigo 3, 29008, Málaga, España. Las finalidades del tratamiento de los datos pueden ser, según los casos, la gestión de reservas y clientes y la gestión de derechos y obligaciones del RGPD. Si necesita más información sobre el tratamiento de datos de carácter personal, puede solicitárnosla escribiéndonos a oficina@parkinglasdelicias.com. Como interesado, tiene derecho a acceder, rectificar y suprimir los datos, solicitar su portabilidad y, si procede, oponerse al tratamiento y solicitar su limitación. Puede ejercer estos derechos por correo electrónico en oficina@parkinglasdelicias.com.";
+const escapeMailHtml = (value: string) => value.replace(/[&<>"']/g, char =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]!));
+
+function officialMailLink(value: string | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function voucherEmail(row: VoucherBooking, links: {terms?: string; privacy?: string}) {
+  const details = voucherDetails(row);
+  const intro = "Hola, " + details.name + ", tu reserva ha sido realizada correctamente, queda poco para que disfrutes de un servicio hecho a tu medida. Mientras tanto, aquí tienes los datos de tu reserva:";
+  const vehicle = [
+    ["Marca", row.vehicle_make_model],
+    ["Matrícula", details.plate],
+  ].filter((field): field is [string, string] => Boolean(field[1]?.trim()));
+  const spaceCode = row.vehicle_type?.code;
+  const space = spaceCode ? vehicleLabels[spaceCode] ?? spaceCode : "—";
+  const sections = [
+    {title:"Tu reserva", fields:[["Código de reserva",details.reference],["Fecha",reservationDate.format(new Date(row.created_at))]]},
+    {title:"Información personal", fields:[["Nombre",details.name],["Correo electrónico",row.customer_email],["Teléfono",row.customer_phone ?? "—"]]},
+    ...(vehicle.length ? [{title:"Vehículo",fields:vehicle}] : []),
+    {title:"Entrada", fields:[["Fecha y hora",details.entry]]},
+    {title:"Salida", fields:[["Fecha y hora",details.exit]]},
+    {title:"Estancia", fields:[["",row.duration_days + (row.duration_days === 1 ? " día" : " días") + " - " + details.amount]]},
+    {title:"Plaza reservada", fields:[["",space]]},
+  ];
+  const terms = officialMailLink(links.terms);
+  const privacy = officialMailLink(links.privacy);
+  const termsText = terms ? "Puede consultar todas las condiciones de su reserva en el siguiente enlace: Condiciones generales (" + terms + ")."
+    : "Puede solicitar las condiciones generales de la reserva en " + office + ".";
+  const privacyText = privacy ? "En la página web Política de privacidad (" + privacy + ") puede consultar nuestra política de privacidad."
+    : "Puede solicitar nuestra política de privacidad en " + office + ".";
+  const mailto = '<a href="mailto:' + office + '">' + office + '</a>';
+  const termsHtml = terms ? 'Puede consultar todas las condiciones de su reserva en el siguiente enlace: <a href="' + escapeMailHtml(terms) + '">Condiciones generales</a>.'
+    : 'Puede solicitar las condiciones generales de la reserva en ' + mailto + '.';
+  const privacyHtml = privacy ? 'En la página web <a href="' + escapeMailHtml(privacy) + '">Política de privacidad</a> puede consultar nuestra política de privacidad.'
+    : 'Puede solicitar nuestra política de privacidad en ' + mailto + '.';
+  const contact = ["Calle Don Rodrigo 3","29008, Málaga (España)","+34 952 212 478",office];
+  const text = [
+    "Parking Las Delicias", "Reserva confirmada", intro,
+    ...sections.map(({title,fields}) => [title, ...fields.map(([label,value]) => label ? label + ": " + value : value)].join("\n")),
+    contact.join("\n"), "Condiciones de la reserva\n" + termsText, "Aviso de confidencialidad\n" + confidentiality,
+    "Aviso de protección de datos de carácter personal\n" + privacyNotice + "\n" + privacyText,
+  ].join("\n\n");
+  const html = `<!doctype html><html lang="es"><body style="margin:0;background:#eef3f7;color:#153047;font-family:Arial,sans-serif">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:20px 12px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #d7e1ea;border-radius:12px">
+<tr><td style="padding:28px;line-height:1.55">
+<img src="cid:parking-las-delicias-logo" width="190" alt="Parking Las Delicias" style="display:block;max-width:100%;height:auto">
+<h1 style="color:#118257;font-size:26px;margin:20px 0 12px">Reserva confirmada</h1>
+<p>${escapeMailHtml(intro)}</p>
+${sections.map(({title,fields}) => `<h2 style="font-size:17px;margin:20px 0 6px;border-bottom:1px solid #d7e1ea">${title}</h2>
+<div>${fields.map(([label,value]) => label ? '<strong>' + label + ':</strong> ' + escapeMailHtml(value) : escapeMailHtml(value)).join('<br>')}</div>`).join('')}
+<p style="margin:24px 0">${contact.slice(0,2).join('<br>')}<br><a href="tel:+34952212478">${contact[2]}</a><br>${mailto}</p>
+<div style="font-size:13px">
+<h2 style="font-size:15px">Condiciones de la reserva</h2><p>${termsHtml}</p>
+<h2 style="font-size:15px">Aviso de confidencialidad</h2><p>${confidentiality}</p>
+<h2 style="font-size:15px">Aviso de protección de datos de carácter personal</h2>
+<p>${privacyNotice.replaceAll(office,mailto)} ${privacyHtml}</p>
+</div></td></tr></table></td></tr></table></body></html>`;
+  return {text,html};
+}
+
 async function sendVouchers(db: BookingDb, row: VoucherBooking, pdf: string) {
   const apiKey = Deno.env.get("INVOICE_RESEND_API_KEY");
   const deliveries = [
     {column:"web_voucher_customer_message_id",to:row.customer_email,kind:"customer"},
     {column:"web_voucher_office_message_id",to:office,kind:"office"},
   ] as const;
-  const results = await Promise.allSettled(deliveries.filter(item => !row[item.column]).map(async item => {
+  const pending = deliveries.filter(item => !row[item.column]);
+  if (!pending.length) return;
+  const content = voucherEmail(row,{
+    terms:Deno.env.get("PARKING_BOOKING_TERMS_URL"),
+    privacy:Deno.env.get("PARKING_PRIVACY_POLICY_URL"),
+  });
+  const results = await Promise.allSettled(pending.map(async item => {
     if (!apiKey || !item.to) throw new Error("Correo de reserva sin configurar: " + item.kind);
     const response = await fetch("https://api.resend.com/emails", {
       method:"POST", signal:AbortSignal.timeout(7000),
@@ -156,10 +242,11 @@ async function sendVouchers(db: BookingDb, row: VoucherBooking, pdf: string) {
       body:JSON.stringify({
         from:"Parking Las Delicias <" + office + ">", to:[item.to], reply_to:office,
         subject:"Reserva confirmada " + row.reference + " · Parking Las Delicias",
-        text:"Reserva " + row.reference + " confirmada para " + row.customer_name + ".\nEntrada: " +
-          bookingDate.format(new Date(row.entry_at)) + "\nSalida prevista: " + bookingDate.format(new Date(row.exit_at)) +
-          "\nImporte pagado: " + bookingAmount.format(Number(row.amount_eur)) + "\n\nAdjuntamos el justificante de la reserva.",
-        attachments:[{filename:"Reserva-" + row.reference + ".pdf",content:pdf}],
+        ...content,
+        attachments:[
+          {filename:"Reserva-" + row.reference + ".pdf",content:pdf,content_type:"application/pdf"},
+          {filename:"logo-las-delicias.png",path:logoUrl,content_id:"parking-las-delicias-logo",content_type:"image/png"},
+        ],
       }),
     });
     const result = await response.json().catch(() => ({}));
