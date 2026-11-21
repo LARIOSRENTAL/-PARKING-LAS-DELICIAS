@@ -84,12 +84,12 @@
 <div class="info-pop hidden" data-pop="MOTO"><strong>MOTO</strong>Motocicletas.</div>
 </div>
 <div class="vehicle-option">
-<button class="vehicle-btn active" data-value="TURISMO"><i class="fa-solid fa-car-side"></i><span class="vehicle-label">ESTANDAR</span></button>
+<button class="vehicle-btn" data-value="TURISMO"><i class="fa-solid fa-car-side"></i><span class="vehicle-label">ESTANDAR</span></button>
 <button class="info-btn" type="button" aria-label="Información sobre ESTANDAR" data-info="TURISMO">i</button>
 <div class="info-pop hidden" data-pop="TURISMO"><strong>ESTANDAR</strong>Turismo de tamaño pequeño y mediano.</div>
 </div>
 <div class="vehicle-option">
-<button class="vehicle-btn" data-value="XL"><i class="fa-solid fa-van-shuttle"></i><span class="vehicle-label">PLAZA XL</span></button>
+<button class="vehicle-btn active" data-value="XL"><i class="fa-solid fa-van-shuttle"></i><span class="vehicle-label">PLAZA XL</span></button>
 <button class="info-btn" type="button" aria-label="Información sobre PLAZA XL" data-info="XL">i</button>
 <div class="info-pop hidden" data-pop="XL"><strong>PLAZA XL</strong>Turismos grandes y furgonetas pequeñas, minivan.</div>
 </div>
@@ -163,7 +163,7 @@
 </footer>
 <script>
 const FN='https://vcwbfljcqpqkmuzcpboi.supabase.co/functions/v1/';
-let lastQuote=null,selectedVehicleType='TURISMO';
+let lastQuote=null,selectedVehicleType='XL';
 const checkoutAvailability=location.protocol==='https:'
  ? fetch(FN+'public-booking',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(data=>data.ready===true).catch(()=>false)
  : Promise.resolve(false);
