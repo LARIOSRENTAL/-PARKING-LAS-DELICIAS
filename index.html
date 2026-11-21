@@ -196,7 +196,8 @@ async function createBooking(){
  try{
   const result=await postFn('public-booking',{vehicleType:quote.vehicleType,entryAt:quote.entryAt,
    durationDays:quote.durationDays,expectedPriceEur:quote.priceEur,customerName:name,customerPhone:phone,
-   customerEmail:email,plate:plate.value.trim(),vehicleMakeModel:vehicleModel.value.trim()});
+   customerEmail:email,plate:plate.value.trim(),vehicleMakeModel:vehicleModel.value.trim(),
+   language:document.documentElement.lang});
   const checkout=new URL(result.checkoutUrl);
   if(checkout.origin!=='https://checkout.stripe.com')throw new Error('No se pudo abrir el pago seguro.');
   location.assign(checkout.href);
