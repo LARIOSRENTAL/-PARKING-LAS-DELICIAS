@@ -1,6 +1,6 @@
 import {createClient} from "npm:@supabase/supabase-js@2.118.0";
 
-import {PDFDocument, StandardFonts, rgb, breakTextIntoLines} from "npm:pdf-lib@1.17.1";
+import {PDFDocument, StandardFonts, rgb} from "npm:pdf-lib@1.17.1";
 
 const site = "https://parkinglasdelicias.com/";
 const cors = {
@@ -44,7 +44,7 @@ async function validSignature(body: string, header: string, secret: string) {
 }
 
 const office = "oficina@parkinglasdelicias.com";
-const voucherFields = "id,reference,amount_eur,created_at,entry_at,exit_at,duration_days,customer_name,customer_email,customer_phone,vehicle_make_model,plate,vehicle_type:vehicle_types(code),status,payment_status,stripe_payment_intent_id,web_voucher_customer_message_id,web_voucher_office_message_id";
+const voucherFields = "id,reference,amount_eur,created_at,entry_at,exit_at,duration_days,customer_name,customer_email,customer_phone,vehicle_make_model,plate,booking_language,vehicle_type:vehicle_types(code),status,payment_status,stripe_payment_intent_id,web_voucher_customer_message_id,web_voucher_office_message_id";
 type VoucherBooking = {
   id: string;
   reference: string;
@@ -58,6 +58,7 @@ type VoucherBooking = {
   customer_phone: string | null;
   vehicle_make_model: string | null;
   vehicle_type: {code: string} | null;
+  booking_language: BookingLanguage;
   plate: string | null;
   status: string;
   payment_status: string;
@@ -112,93 +113,8 @@ function voucherDetails(row: VoucherBooking) {
   };
 }
 
-async function voucherPdf(row: VoucherBooking) {
-  const {heading,intro,sections} = voucherContent(row);
-  const pdf = await PDFDocument.create();
-  pdf.setCreationDate(new Date(row.entry_at));
-  pdf.setModificationDate(new Date(row.entry_at));
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const navy = rgb(.07, .19, .28);
-  const green = rgb(.05, .43, .27);
-  const divider = rgb(.84, .88, .92);
-  const width = 595;
-  const height = 842;
-  const margin = 44;
-  const innerWidth = width - 2 * margin;
-  let page = pdf.addPage([width,height]);
-  let y = height - margin;
-  const png = await fetch(logoUrl, {signal:AbortSignal.timeout(5000)})
-    .then(response => response.ok ? response.arrayBuffer() : null).catch(() => null);
-  if (png) {
-    const logo = await pdf.embedPng(png);
-    const size = logo.scaleToFit(190,55);
-    page.drawImage(logo,{x:margin,y:y-size.height,width:size.width,height:size.height});
-    y -= size.height + 28;
-  }
-
-  const printable = (value: string) => Array.from(value.normalize("NFC"), char => {
-    try { regular.encodeText(char); return char; } catch { return "?"; }
-  }).join("");
-
-  const size = 11;
-  const leading = 16;
-  function wrap(value: string, available: number) {
-    const measure = (line: string) => regular.widthOfTextAtSize(line,size);
-    const lines = breakTextIntoLines(printable(value).replace(/\s+/g," "),[" ","@","-","."],available,measure);
-    return lines.flatMap(line => {
-      if (measure(line) <= available) return [line];
-      const chunks: string[] = [];
-      let chunk = "";
-      for (const char of line) {
-        if (measure(chunk+char) > available) {
-          chunks.push(chunk);
-          chunk = "";
-        }
-        chunk += char;
-      }
-      chunks.push(chunk);
-      return chunks;
-    });
-  }
-
-  page.drawText(heading,{x:margin,y:y-24,size:26,font:bold,color:green});
-  y -= 49;
-  for (const line of wrap(intro,innerWidth)) {
-    page.drawText(line,{x:margin,y,size,font:regular,color:navy});
-    y -= leading;
-  }
-  y -= 12;
-
-  for (const {title,fields} of sections) {
-    const labelWidth = 140;
-    const rows = fields.map(([label,value]) => ({label,lines:wrap(value,innerWidth-(label ? labelWidth : 0))}));
-    const sectionHeight = 38 + rows.reduce((total,row) => total + row.lines.length*leading + 2,0);
-    if (y-sectionHeight < margin) {
-      page = pdf.addPage([width,height]);
-      y = height - margin;
-    }
-    page.drawText(title,{x:margin,y,size:14,font:bold,color:navy});
-    page.drawLine({start:{x:margin,y:y-7},end:{x:width-margin,y:y-7},thickness:.8,color:divider});
-    y -= 26;
-    for (const {label,lines} of rows) {
-      if (label) page.drawText(label + ":",{x:margin,y,size,font:bold,color:navy});
-      for (const line of lines) {
-        page.drawText(line,{x:margin+(label ? labelWidth : 0),y,size,font:regular,color:navy});
-        y -= leading;
-      }
-      y -= 2;
-    }
-    y -= 12;
-  }
-  return pdf.saveAsBase64();
-}
 
 const logoUrl = site + "backoffice/assets/logo-las-delicias.png";
-const vehicleLabels: Record<string, string> = {
-  MOTO: "Moto", TURISMO: "Estándar", XL: "XL", XXL: "XXL",
-};
-const reservationDate = new Intl.DateTimeFormat("es-ES", {timeZone:"Europe/Madrid", dateStyle:"long"});
 const confidentiality = "Este correo electrónico y, en su caso, cualquier fichero anexo al mismo, contiene información de carácter confidencial exclusivamente dirigida a su destinatario o destinatarios. Queda prohibida su divulgación, copia o distribución a terceros sin la previa autorización expresa y escrita de su autor. En el caso de haber recibido este correo electrónico por error, se ruega que se notifique inmediatamente esta circunstancia mediante reenvío a la dirección electrónica del remitente. Gracias.";
 const privacyNotice = "En cumplimiento del Reglamento General de Protección de Datos en relación a los datos de carácter personal que haya proporcionado o pueda proporcionar a Aparcamiento Las Delicias Malaga, S.L. o a su personal, le informamos que el responsable del tratamiento es Aparcamiento Las Delicias Malaga, S.L., con domicilio en Calle Don Rodrigo 3, 29008, Málaga, España. Las finalidades del tratamiento de los datos pueden ser, según los casos, la gestión de reservas y clientes y la gestión de derechos y obligaciones del RGPD. Si necesita más información sobre el tratamiento de datos de carácter personal, puede solicitárnosla escribiéndonos a oficina@parkinglasdelicias.com. Como interesado, tiene derecho a acceder, rectificar y suprimir los datos, solicitar su portabilidad y, si procede, oponerse al tratamiento y solicitar su limitación. Puede ejercer estos derechos por correo electrónico en oficina@parkinglasdelicias.com.";
 const escapeMailHtml = (value: string) => value.replace(/[&<>"']/g, char =>
@@ -214,97 +130,241 @@ function officialMailLink(value: string | undefined) {
   }
 }
 
-function voucherContent(row: VoucherBooking) {
-  const heading = "Reserva confirmada";
-  const details = voucherDetails(row);
-  const intro = "Hola, " + details.name + ", tu reserva ha sido realizada correctamente, queda poco para que disfrutes de un servicio hecho a tu medida. Mientras tanto, aquí tienes los datos de tu reserva:";
-  const vehicle = [
-    ["Marca", row.vehicle_make_model],
-    ["Matrícula", details.plate],
-  ].filter((field): field is [string, string] => Boolean(field[1]?.trim()));
-  const spaceCode = row.vehicle_type?.code;
-  const space = spaceCode ? vehicleLabels[spaceCode] ?? spaceCode : "—";
-  const sections = [
-    {title:"Tu reserva", fields:[["Código de reserva",details.reference],["Fecha",reservationDate.format(new Date(row.created_at))]]},
-    {title:"Información personal", fields:[["Nombre",details.name],["Correo electrónico",row.customer_email],["Teléfono",row.customer_phone ?? "—"]]},
-    ...(vehicle.length ? [{title:"Vehículo",fields:vehicle}] : []),
-    {title:"Entrada", fields:[["Fecha y hora",details.entry]]},
-    {title:"Salida", fields:[["Fecha y hora",details.exit]]},
-    {title:"Estancia", fields:[["",row.duration_days + (row.duration_days === 1 ? " día" : " días") + " - " + details.amount]]},
-    {title:"Plaza reservada", fields:[["",space]]},
-  ];
-  return {heading,intro,sections};
+const locales = {es:"es-ES",en:"en-GB",fr:"fr-FR",it:"it-IT",de:"de-DE"} as const;
+type BookingLanguage = keyof typeof locales;
+function bookingLanguage(value: unknown): BookingLanguage {
+  return typeof value === "string" && Object.hasOwn(locales,value) ? value as BookingLanguage : "es";
 }
 
-function voucherEmail(row: VoucherBooking, links: {terms?: string; privacy?: string}) {
-  const {heading,intro,sections} = voucherContent(row);
-  const terms = officialMailLink(links.terms);
-  const privacy = officialMailLink(links.privacy);
-  const termsText = terms ? "Puede consultar todas las condiciones de su reserva en el siguiente enlace: Condiciones generales (" + terms + ")."
-    : "Puede solicitar las condiciones generales de la reserva en " + office + ".";
-  const privacyText = privacy ? "En la página web Política de privacidad (" + privacy + ") puede consultar nuestra política de privacidad."
-    : "Puede solicitar nuestra política de privacidad en " + office + ".";
-  const mailto = '<a href="mailto:' + office + '">' + office + '</a>';
-  const termsHtml = terms ? 'Puede consultar todas las condiciones de su reserva en el siguiente enlace: <a href="' + escapeMailHtml(terms) + '">Condiciones generales</a>.'
-    : 'Puede solicitar las condiciones generales de la reserva en ' + mailto + '.';
-  const privacyHtml = privacy ? 'En la página web <a href="' + escapeMailHtml(privacy) + '">Política de privacidad</a> puede consultar nuestra política de privacidad.'
-    : 'Puede solicitar nuestra política de privacidad en ' + mailto + '.';
-  const contact = ["Calle Don Rodrigo 3","29008, Málaga (España)","+34 952 212 478",office];
-  const text = [
-    "Parking Las Delicias", heading, intro,
-    ...sections.map(({title,fields}) => [title, ...fields.map(([label,value]) => label ? label + ": " + value : value)].join("\n")),
-    "Parking Las Delicias\n" + contact.join("\n"), "Condiciones de la reserva\n" + termsText, "Aviso de confidencialidad\n" + confidentiality,
-    "Aviso de protección de datos de carácter personal\n" + privacyNotice + "\n" + privacyText,
+const spanishLabels = {
+  title:"Reserva confirmada", voucher:"Comprobante de reserva", thanks:"Gracias por reservar con Parking Las Delicias.",
+  ref:"Número de reserva", date:"Fecha de reserva", dates:"Fechas de la reserva", in:"Entrada", out:"Salida",
+  summary:"Resumen de la estancia", duration:"Duración", space:"Plaza reservada", total:"Importe total",
+  details:"Datos de la reserva", holder:"Titular", car:"Vehículo", name:"Nombre", email:"Correo",
+  phone:"Teléfono", model:"Marca / modelo", plate:"Matrícula", one:"día", many:"días", standard:"Estándar",
+  terms:"Condiciones de la reserva", general:"Condiciones generales", privacy:"Política de privacidad",
+  confidentiality:"Aviso de confidencialidad", data:"Aviso de protección de datos de carácter personal", country:"España",
+  termsText:"Puede consultar todas las condiciones de su reserva en el siguiente enlace",
+  privacyText:"Puede consultar nuestra política de privacidad aquí",
+  ask:"Puede solicitar más información en",
+  confidentialText:confidentiality, privacyNoticeText:privacyNotice,
+};
+const labels: Record<BookingLanguage, typeof spanishLabels> = {
+  es:spanishLabels,
+  en:{
+    title:"Booking confirmed",voucher:"Booking voucher",thanks:"Thank you for booking with Parking Las Delicias.",
+    ref:"Booking number",date:"Booking date",dates:"Booking dates",in:"Entry",out:"Exit",
+    summary:"Stay summary",duration:"Duration",space:"Reserved space",total:"Total amount",details:"Booking details",
+    holder:"Booking holder",car:"Vehicle",name:"Name",email:"Email",phone:"Phone",model:"Make / model",plate:"Registration number",
+    one:"day",many:"days",standard:"Standard",terms:"Booking terms",general:"General terms and conditions",privacy:"Privacy policy",
+    confidentiality:"Confidentiality notice",data:"Personal data protection notice",country:"Spain",
+    termsText:"You can find all your booking terms at the following link",privacyText:"Read our privacy policy here",ask:"You can request more information at",
+    confidentialText:"This email and any attachments are confidential and intended solely for the addressee. Disclosure, copying or distribution to third parties requires the sender’s prior written consent. If you received this message in error, please forward it to the sender immediately.",
+    privacyNoticeText:"Aparcamiento Las Delicias Malaga, S.L., Calle Don Rodrigo 3, 29008 Málaga, Spain, is the controller of your personal data. It processes the data to manage reservations and customers and to handle GDPR rights and obligations. You may request information or exercise your rights of access, rectification, erasure, portability, objection or restriction, where applicable, by contacting oficina@parkinglasdelicias.com.",
+  },
+  fr:{
+    title:"Réservation confirmée",voucher:"Bon de réservation",thanks:"Merci d’avoir réservé auprès de Parking Las Delicias.",
+    ref:"Numéro de réservation",date:"Date de réservation",dates:"Dates de réservation",in:"Entrée",out:"Sortie",
+    summary:"Récapitulatif du séjour",duration:"Durée",space:"Place réservée",total:"Montant total",details:"Détails de la réservation",
+    holder:"Titulaire",car:"Véhicule",name:"Nom",email:"E-mail",phone:"Téléphone",model:"Marque / modèle",plate:"Immatriculation",
+    one:"jour",many:"jours",standard:"Standard",terms:"Conditions de réservation",general:"Conditions générales",privacy:"Politique de confidentialité",
+    confidentiality:"Avis de confidentialité",data:"Avis relatif à la protection des données personnelles",country:"Espagne",
+    termsText:"Vous pouvez consulter toutes les conditions de votre réservation via ce lien",privacyText:"Consultez notre politique de confidentialité ici",ask:"Pour plus d’informations, écrivez à",
+    confidentialText:"Ce courriel et ses éventuelles pièces jointes sont confidentiels et destinés exclusivement à leurs destinataires. Toute divulgation, copie ou distribution à des tiers requiert l’autorisation écrite préalable de l’expéditeur. Si vous avez reçu ce message par erreur, veuillez le transférer immédiatement à l’expéditeur.",
+    privacyNoticeText:"Aparcamiento Las Delicias Malaga, S.L., Calle Don Rodrigo 3, 29008 Málaga, Espagne, est responsable du traitement de vos données personnelles. Elles sont traitées pour gérer les réservations et les clients, ainsi que les droits et obligations prévus par le RGPD. Pour obtenir des informations ou exercer vos droits d’accès, de rectification, d’effacement, de portabilité, d’opposition ou de limitation, selon le cas, écrivez à oficina@parkinglasdelicias.com.",
+  },
+  it:{
+    title:"Prenotazione confermata",voucher:"Voucher di prenotazione",thanks:"Grazie per aver prenotato con Parking Las Delicias.",
+    ref:"Numero di prenotazione",date:"Data della prenotazione",dates:"Date della prenotazione",in:"Ingresso",out:"Uscita",
+    summary:"Riepilogo della sosta",duration:"Durata",space:"Posto prenotato",total:"Importo totale",details:"Dettagli della prenotazione",
+    holder:"Intestatario",car:"Veicolo",name:"Nome",email:"E-mail",phone:"Telefono",model:"Marca / modello",plate:"Targa",
+    one:"giorno",many:"giorni",standard:"Standard",terms:"Condizioni di prenotazione",general:"Condizioni generali",privacy:"Informativa sulla privacy",
+    confidentiality:"Avviso di riservatezza",data:"Informativa sulla protezione dei dati personali",country:"Spagna",
+    termsText:"Può consultare tutte le condizioni della prenotazione al seguente link",privacyText:"Può consultare qui la nostra informativa sulla privacy",ask:"Per maggiori informazioni, scriva a",
+    confidentialText:"Questa e-mail e gli eventuali allegati sono riservati e destinati esclusivamente ai destinatari. La divulgazione, la copia o la distribuzione a terzi richiede il previo consenso scritto del mittente. Se ha ricevuto il messaggio per errore, lo inoltri immediatamente al mittente.",
+    privacyNoticeText:"Aparcamiento Las Delicias Malaga, S.L., Calle Don Rodrigo 3, 29008 Málaga, Spagna, è il titolare del trattamento dei dati personali. I dati sono trattati per gestire prenotazioni e clienti e per adempiere ai diritti e agli obblighi previsti dal GDPR. Per informazioni o per esercitare, ove applicabili, i diritti di accesso, rettifica, cancellazione, portabilità, opposizione o limitazione del trattamento, scriva a oficina@parkinglasdelicias.com.",
+  },
+  de:{
+    title:"Buchung bestätigt",voucher:"Buchungsbeleg",thanks:"Vielen Dank für Ihre Buchung bei Parking Las Delicias.",
+    ref:"Buchungsnummer",date:"Buchungsdatum",dates:"Buchungszeitraum",in:"Einfahrt",out:"Ausfahrt",
+    summary:"Übersicht zur Parkdauer",duration:"Dauer",space:"Reservierter Stellplatz",total:"Gesamtbetrag",details:"Buchungsdetails",
+    holder:"Buchungsinhaber",car:"Fahrzeug",name:"Name",email:"E-Mail",phone:"Telefon",model:"Marke / Modell",plate:"Kennzeichen",
+    one:"Tag",many:"Tage",standard:"Standard",terms:"Buchungsbedingungen",general:"Allgemeine Bedingungen",privacy:"Datenschutzerklärung",
+    confidentiality:"Vertraulichkeitshinweis",data:"Hinweis zum Schutz personenbezogener Daten",country:"Spanien",
+    termsText:"Alle Buchungsbedingungen finden Sie unter folgendem Link",privacyText:"Unsere Datenschutzerklärung finden Sie hier",ask:"Weitere Informationen erhalten Sie unter",
+    confidentialText:"Diese E-Mail und etwaige Anhänge sind vertraulich und ausschließlich für die Empfänger bestimmt. Eine Offenlegung, Vervielfältigung oder Weitergabe an Dritte bedarf der vorherigen schriftlichen Genehmigung des Absenders. Falls Sie diese Nachricht irrtümlich erhalten haben, leiten Sie sie bitte umgehend an den Absender zurück.",
+    privacyNoticeText:"Aparcamiento Las Delicias Malaga, S.L., Calle Don Rodrigo 3, 29008 Málaga, Spanien, ist für die Verarbeitung Ihrer personenbezogenen Daten verantwortlich. Die Daten werden zur Verwaltung von Buchungen und Kunden sowie zur Wahrnehmung von Rechten und Pflichten nach der DSGVO verarbeitet. Für Auskünfte und zur Ausübung Ihrer Rechte auf Auskunft, Berichtigung, Löschung, Datenübertragbarkeit, Widerspruch oder Einschränkung der Verarbeitung wenden Sie sich gegebenenfalls an oficina@parkinglasdelicias.com.",
+  },
+};
+
+function voucherContent(row: VoucherBooking, language: BookingLanguage) {
+  const copy = labels[language];
+  const locale = locales[language];
+  const date = (value: string, options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(locale,{timeZone:"Europe/Madrid",...options}).format(new Date(value));
+  const arrival = date(row.entry_at,{dateStyle:"medium",timeStyle:"short"});
+  const departure = date(row.exit_at,{dateStyle:"medium",timeStyle:"short"});
+  const cost = new Intl.NumberFormat(locale,{style:"currency",currency:"EUR"}).format(Number(row.amount_eur));
+  const duration = row.duration_days + " " + (row.duration_days === 1 ? copy.one : copy.many);
+  const spaceCode = row.vehicle_type?.code ?? "";
+  const space = spaceCode === "MOTO" ? (language === "en" ? "Motorcycle" : language === "de" ? "Motorrad" : "Moto") : spaceCode === "TURISMO" ? copy.standard : spaceCode || "—";
+  const holder = [[copy.name,row.customer_name],[copy.email,row.customer_email],[copy.phone,row.customer_phone ?? "—"]];
+  const vehicle = [[copy.model,row.vehicle_make_model],[copy.plate,row.plate]]
+    .filter((field): field is [string,string] => Boolean(field[1]?.trim()));
+  return {copy,date,arrival,departure,cost,duration,space,holder,vehicle};
+}
+
+async function voucherPdf(row: VoucherBooking, language: BookingLanguage) {
+  const {copy,date,cost,duration,space,holder,vehicle} = voucherContent(row,language);
+  const pdf = await PDFDocument.create();
+  pdf.setCreationDate(new Date(row.created_at));
+  pdf.setModificationDate(new Date(row.created_at));
+  pdf.setLanguage(language);
+  pdf.setTitle(copy.voucher + " " + row.reference);
+  const page = pdf.addPage([595,842]);
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const navy = rgb(.052,.11,.26), dark = rgb(.078,.16,.23), muted = rgb(.38,.45,.55);
+  const green = rgb(.04,.46,.32), paleGreen = rgb(.906,.955,.932), pale = rgb(.94,.955,.974), line = rgb(.83,.87,.93);
+  const printable = (value: string) => Array.from(value.normalize("NFC"),char => {
+    if (/\s/.test(char)) return " ";
+    try { regular.encodeText(char); return char; } catch { return "?"; }
+  }).join("");
+  function draw(value: string,x: number,y: number,size: number,font=regular,color=dark,max=510) {
+    const text = printable(value);
+    const fitted = Math.min(size, size*max/Math.max(1,font.widthOfTextAtSize(text,size)));
+    page.drawText(text,{x,y,size:fitted,font,color});
+  }
+  const label = (value: string,x: number,y: number) => draw(value.toLocaleUpperCase(language),x,y,8.3,bold,muted);
+  const rule = (y: number) => page.drawLine({start:{x:44,y},end:{x:551,y},color:line,thickness:.65});
+  function card(x: number,y: number,w: number,h: number,color: ReturnType<typeof rgb>,border=false) {
+    const r = 12;
+    const path = `M0,${r} Q0,0 ${r},0 H${w-r} Q${w},0 ${w},${r} V${h-r} Q${w},${h} ${w-r},${h} H${r} Q0,${h} 0,${h-r} Z`;
+    page.drawSvgPath(path,{x,y:y+h,color,borderColor:border ? line : undefined,borderWidth:border ? .8 : undefined});
+  }
+  const imageBytes = await fetch(logoUrl,{signal:AbortSignal.timeout(5000)}).then(r=>r.ok?r.arrayBuffer():null).catch(()=>null);
+  if (imageBytes) {
+    const logo = await pdf.embedPng(imageBytes);
+    const dim = logo.scaleToFit(188,58);
+    page.drawImage(logo,{x:44,y:737,width:dim.width,height:dim.height});
+  } else {
+    draw("Parking Las Delicias",44,760,19,bold,navy);
+  }
+  label(copy.voucher,405,777);
+  draw(date(row.created_at,{dateStyle:"long"}),405,758,9,regular,dark,145);
+  rule(720);
+  card(44,629,507,76,paleGreen);
+  page.drawCircle({x:74,y:676,size:14,color:green});
+  page.drawLine({start:{x:70,y:676},end:{x:73,y:672},color:rgb(1,1,1),thickness:1.4});
+  page.drawLine({start:{x:73,y:672},end:{x:79,y:680},color:rgb(1,1,1),thickness:1.4});
+  draw(copy.title,101,677,20,bold,green);
+  draw(copy.thanks,101,654,10);
+  label(copy.ref,44,600);
+  draw(row.reference,44,575,22,bold,navy);
+  rule(559);
+  draw(copy.dates.toLocaleUpperCase(language),44,537,9.2,bold,navy);
+  for (const [title,value,x] of [[copy.in,row.entry_at,44],[copy.out,row.exit_at,305]] as const) {
+    card(x,430,246,92,pale);
+    label(title,x+15,500);
+    draw(date(value,{weekday:"short",day:"numeric",month:"long",year:"numeric"}),x+15,474,12,bold,dark,215);
+    draw(date(value,{hour:"2-digit",minute:"2-digit",hourCycle:"h23"}),x+15,451,17,bold,navy);
+  }
+  draw(copy.summary.toLocaleUpperCase(language),44,407,9.2,bold,navy);
+  card(44,303,507,89,rgb(1,1,1),true);
+  const cells = [[copy.duration,duration,59,navy],[copy.space,space,228,navy],[copy.total,cost,397,green]] as const;
+  for (const [title,value,x,color] of cells) { label(title,x,364); draw(value,x,329,16,bold,color,147); }
+  for (const x of [213,382]) page.drawLine({start:{x,y:318},end:{x,y:377},color:line,thickness:.65});
+  draw(copy.details.toLocaleUpperCase(language),44,273,9.2,bold,navy);
+  card(44,129,507,128,pale);
+  for (const [title,fields,x] of [[copy.holder,holder,61],[copy.car,vehicle,303]] as const) {
+    if (fields.length === 0) continue;
+    label(title,x,238);
+    fields.forEach(([name,value],i)=>{
+      draw(name,x,215-29*i,8,regular,muted);
+      draw(value,x,201-29*i,10.5,bold,dark,vehicle.length ? 225 : 470);
+    });
+  }
+  rule(87);
+  draw("PARKING LAS DELICIAS",44,70,9,bold,navy);
+  draw("Calle Don Rodrigo 3 · 29008 Málaga ("+copy.country+")",44,55,8.5,regular,muted);
+  draw("+34 952 212 478 · "+office,44,43,8.5,regular,muted);
+  return pdf.saveAsBase64();
+}
+
+function voucherEmail(row: VoucherBooking, language: BookingLanguage) {
+  const {copy,date,arrival,departure,cost,duration,space,holder,vehicle} = voucherContent(row,language);
+  const terms = officialMailLink(Deno.env.get("PARKING_BOOKING_TERMS_URL") ?? site+"condiciones-generales.html");
+  const privacy = officialMailLink(Deno.env.get("PARKING_PRIVACY_POLICY_URL") ?? site+"politica-de-privacidad.html");
+  const sections = [
+    {title:copy.ref,fields:[[copy.ref,row.reference],[copy.date,date(row.created_at,{dateStyle:"long"})]]},
+    {title:copy.dates,fields:[[copy.in,arrival],[copy.out,departure]]},
+    {title:copy.summary,fields:[[copy.duration,duration],[copy.space,space],[copy.total,cost]]},
+    {title:copy.holder,fields:holder},
+    ...(vehicle.length ? [{title:copy.car,fields:vehicle}] : []),
+  ];
+  const contact = ["Calle Don Rodrigo 3","29008, Málaga ("+copy.country+")","+34 952 212 478",office];
+  const ask = copy.ask + " " + office + ".";
+  const mailto = '<a href="mailto:'+office+'">'+office+'</a>';
+  const text = [copy.title,copy.thanks,
+    ...sections.map(({title,fields}) => [title,...fields.map(([key,value])=>key+": "+value)].join("\n")),
+    "Parking Las Delicias\n"+contact.join("\n"),
+    copy.terms+"\n"+(terms ? copy.termsText+": "+copy.general+" ("+terms+")" : ask),
+    copy.confidentiality+"\n"+copy.confidentialText,
+    copy.data+"\n"+copy.privacyNoticeText+"\n"+(privacy ? copy.privacyText+": "+privacy : ask),
   ].join("\n\n");
-  const html = `<!doctype html><html lang="es"><body style="margin:0;background:#eef3f7;color:#153047;font-family:Arial,sans-serif">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:20px 12px">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #d7e1ea;border-radius:12px">
-<tr><td style="padding:28px;line-height:1.55">
-<img src="cid:parking-las-delicias-logo" width="190" alt="Parking Las Delicias" style="display:block;max-width:100%;height:auto">
-<h1 style="color:#118257;font-size:26px;margin:20px 0 12px">${heading}</h1>
-<p>${escapeMailHtml(intro)}</p>
-${sections.map(({title,fields}) => `<h2 style="font-size:17px;margin:20px 0 6px;border-bottom:1px solid #d7e1ea">${title}</h2>
-<div>${fields.map(([label,value]) => label ? '<strong>' + label + ':</strong> ' + escapeMailHtml(value) : escapeMailHtml(value)).join('<br>')}</div>`).join('')}
-</td></tr>
-<tr><td style="padding:24px 28px;background:#f6f8fb;border-top:1px solid #d7e1ea;line-height:1.55">
-<img src="cid:parking-las-delicias-logo" width="150" alt="Parking Las Delicias" style="display:block;max-width:100%;height:auto">
-<p style="margin:12px 0 20px">${contact.slice(0,2).join('<br>')}<br><a href="tel:+34952212478">${contact[2]}</a><br>${mailto}</p>
-<div style="font-size:13px">
-<h2 style="font-size:15px">Condiciones de la reserva</h2><p>${termsHtml}</p>
-<h2 style="font-size:15px">Aviso de confidencialidad</h2><p>${confidentiality}</p>
-<h2 style="font-size:15px">Aviso de protección de datos de carácter personal</h2>
-<p>${privacyNotice.replaceAll(office,mailto)} ${privacyHtml}</p>
-</div></td></tr></table></td></tr></table></body></html>`;
+  const img = '<img src="cid:parking-las-delicias-logo" width="180" alt="Parking Las Delicias" style="display:block;max-width:100%;height:auto">';
+  const link = (url: string|null,intro: string,title: string) => url
+    ? intro+': <a href="'+escapeMailHtml(url)+'">'+title+'</a>' : copy.ask+' '+mailto+'.';
+  const html = `<!doctype html><html lang="${language}"><body style="margin:0;background:#eef3f7;color:#153047;font-family:Arial,sans-serif">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:20px 12px">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:white;border:1px solid #d7e1ea">
+  <tr><td style="padding:28px;line-height:1.55">${img}<h1 style="color:#118257;font-size:26px">${copy.title}</h1><p>${copy.thanks}</p>
+  ${sections.map(({title,fields})=>`<h2 style="font-size:17px;border-bottom:1px solid #d7e1ea">${title}</h2><div>${fields.map(([key,value])=>'<strong>'+key+':</strong> '+escapeMailHtml(value)).join('<br>')}</div>`).join('')}
+  </td></tr><tr><td style="padding:24px 28px;background:#f6f8fb;border-top:1px solid #d7e1ea;line-height:1.55;font-size:13px">${img}
+  <p>${contact.slice(0,2).join('<br>')}<br><a href="tel:+34952212478">${contact[2]}</a><br>${mailto}</p>
+  <h2 style="font-size:15px">${copy.terms}</h2><p>${link(terms,copy.termsText,copy.general)}</p>
+  <h2 style="font-size:15px">${copy.confidentiality}</h2><p>${copy.confidentialText}</p>
+  <h2 style="font-size:15px">${copy.data}</h2><p>${copy.privacyNoticeText.replaceAll(office,mailto)} ${link(privacy,copy.privacyText,copy.privacy)}</p>
+  </td></tr></table></td></tr></table></body></html>`;
   return {text,html};
 }
 
-async function sendVouchers(db: BookingDb, row: VoucherBooking, pdf: string) {
+function voucherMessage(row: VoucherBooking, to: string, language: BookingLanguage, pdf: string, prefix = "") {
+  return {
+    from:"Parking Las Delicias <"+office+">", to:[to], reply_to:office,
+    subject:prefix + labels[language].title + " " + row.reference + " · Parking Las Delicias",
+    ...voucherEmail(row,language),
+    attachments:[
+      {filename:"Parking-Las-Delicias-"+row.reference+"-"+language+".pdf",content:pdf,content_type:"application/pdf"},
+      {filename:"logo-las-delicias.png",path:logoUrl,content_id:"parking-las-delicias-logo",content_type:"image/png"},
+    ],
+  };
+}
+
+async function sendVouchers(db: BookingDb, row: VoucherBooking, customerPdf?: string) {
   const apiKey = Deno.env.get("INVOICE_RESEND_API_KEY");
+  const customerLanguage = bookingLanguage(row.booking_language);
   const deliveries = [
-    {column:"web_voucher_customer_message_id",to:row.customer_email,kind:"customer"},
-    {column:"web_voucher_office_message_id",to:office,kind:"office"},
+    {column:"web_voucher_customer_message_id",to:row.customer_email,kind:"customer",language:customerLanguage},
+    {column:"web_voucher_office_message_id",to:office,kind:"office",language:"es"},
   ] as const;
   const pending = deliveries.filter(item => !row[item.column]);
   if (!pending.length) return;
-  const content = voucherEmail(row,{
-    terms:Deno.env.get("PARKING_BOOKING_TERMS_URL"),
-    privacy:Deno.env.get("PARKING_PRIVACY_POLICY_URL"),
-  });
+  const pdfs = new Map<BookingLanguage,Promise<string>>();
+  if (customerPdf) pdfs.set(customerLanguage, Promise.resolve(customerPdf));
   const results = await Promise.allSettled(pending.map(async item => {
     if (!apiKey || !item.to) throw new Error("Correo de reserva sin configurar: " + item.kind);
+    let pdf = pdfs.get(item.language);
+    if (!pdf) {
+      pdf = voucherPdf(row,item.language);
+      pdfs.set(item.language,pdf);
+    }
+    const message = voucherMessage(row,item.to,item.language,await pdf);
     const response = await fetch("https://api.resend.com/emails", {
       method:"POST", signal:AbortSignal.timeout(7000),
       headers:{Authorization:"Bearer " + apiKey,"Content-Type":"application/json",
         "Idempotency-Key":"parking-voucher-" + row.id + "-" + item.kind},
-      body:JSON.stringify({
-        from:"Parking Las Delicias <" + office + ">", to:[item.to], reply_to:office,
-        subject:"Reserva confirmada " + row.reference + " · Parking Las Delicias",
-        ...content,
-        attachments:[
-          {filename:"Reserva-" + row.reference + ".pdf",content:pdf,content_type:"application/pdf"},
-          {filename:"logo-las-delicias.png",path:logoUrl,content_id:"parking-las-delicias-logo",content_type:"image/png"},
-        ],
-      }),
+      body:JSON.stringify(message),
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || !result.id) throw new Error("Resend justificante " + item.kind + " HTTP " + response.status);
@@ -354,7 +414,7 @@ Deno.serve(async req => {
       const confirmed = row && await confirmPayment(db, row, session);
       if (!confirmed) return json({error:"Pago sin correspondencia o reserva requiere revisión"},409);
       if (!confirmed.web_voucher_customer_message_id || !confirmed.web_voucher_office_message_id) {
-        await sendVouchers(db,confirmed,await voucherPdf(confirmed));
+        await sendVouchers(db,confirmed);
       }
       return json({received:true});
     }
@@ -370,11 +430,12 @@ Deno.serve(async req => {
         row = await confirmPayment(db,row,session);
       }
       if (!row || row.payment_status !== "paid") return json({paid:false});
-      const pdf = await voucherPdf(row);
+      const pdf = await voucherPdf(row,bookingLanguage(row.booking_language));
       sendVouchersInBackground(db,row,pdf);
       return json({paid:true,reference:row.reference,voucher:voucherDetails(row),pdf});
     }
     if (!ready || !key) return json({error:"El pago online todavía no está disponible. No se ha creado ninguna reserva."},503);
+    const language = bookingLanguage(body.language);
     const vehicle = String(body.vehicleType || "").toUpperCase();
     const days = Number(body.durationDays);
     const entry = new Date(String(body.entryAt || ""));
@@ -406,7 +467,7 @@ Deno.serve(async req => {
     const expires = Math.floor(Date.now()/1000) + 31*60;
     const {data:hold,error:holdError} = await db.from("reservations").insert({
       vehicle_type_id:vt.id,entry_at:entryAt,duration_days:days,customer_name:name,customer_email:email,
-      customer_phone:phone,plate:plate||null,vehicle_make_model:model||null,source:"web",status:"pending_payment",
+      customer_phone:phone,plate:plate||null,vehicle_make_model:model||null,source:"web",status:"pending_payment",booking_language:language,
       payment_status:"pending",manual_price_override:true,amount_eur:price,
       expires_at:new Date((expires+15*60)*1000).toISOString(),
     }).select("id").single();
@@ -418,7 +479,7 @@ Deno.serve(async req => {
     let session;
     try {
       const params = new URLSearchParams({
-        mode:"payment", locale:"es", "customer_email":email,
+        mode:"payment", locale:language, "customer_email":email,
         "line_items[0][price_data][currency]":"eur","line_items[0][price_data][unit_amount]":String(cents),
         "line_items[0][price_data][product_data][name]":"Parking Las Delicias · "+vehicle+" · "+days+" día(s)",
         "line_items[0][quantity]":"1","metadata[parking_reservation]":hold.id,expires_at:String(expires),
