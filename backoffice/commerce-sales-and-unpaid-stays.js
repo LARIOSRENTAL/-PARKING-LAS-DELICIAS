@@ -205,12 +205,53 @@ const paySubscribersBeforeZeroCharge=paySubscriberIds;
 paySubscriberIds=async function(ids,method){const billable=ids.filter(id=>!subscriberHasZeroCharge(monthlySubscribers.find(s=>s.id===id)));if(!billable.length)return alert('Los abonados sin cuota no tienen recibo que cobrar. Su ficha está disponible para consulta y edición.');return paySubscribersBeforeZeroCharge(billable,method)};
 const rpcBeforeZeroCharge=db.rpc.bind(db);
 db.rpc=function(name,args,options){if(name==='mark_monthly_subscription_paid'&&subscriberHasZeroCharge(monthlySubscribers.find(s=>s.id===args.p_subscriber_id)))return Promise.resolve({data:null,error:{message:'Este abonado tiene cuota de 0 €. No hay recibo que cobrar.'}});return rpcBeforeZeroCharge(name,args,options)};
-/* Cancel duplicates before the first entry, retaining payment and audit records. */
+function canCancelPendingParkingStay(reservation){
+ if(!reservation || reservation.last_movement_at)return false;
+ if(reservation.source==='web' && reservation.payment_status==='paid')return false;
+ return ['pending_payment','confirmed'].includes(reservation.status);
+}
 const reservationTableBeforeCancel=reservationTable;
-reservationTable=function(rows,actions=false){const html=reservationTableBeforeCancel(rows,actions);if(!actions)return html;const template=document.createElement('template');template.innerHTML=html;const rendered=template.content.querySelectorAll('tbody tr');rows.forEach((r,i)=>{if(!['pending_payment','confirmed'].includes(r.status)||r.last_movement_at)return;const b=document.createElement('button');b.type='button';b.className='mini red';b.textContent='Anular estancia';b.dataset.cancelStay=r.id;b.setAttribute('onclick',"cancelPendingParkingStay('"+r.id+"')");rendered[i]?.querySelector('.actions')?.append(b)});return template.innerHTML};
+reservationTable=function(rows,actions=false){
+ const html=reservationTableBeforeCancel(rows,actions);
+ if(!actions)return html;
+ const template=document.createElement('template');
+ template.innerHTML=html;
+ const rendered=template.content.querySelectorAll('tbody tr');
+ rows.forEach((reservation,index)=>{
+  if(!canCancelPendingParkingStay(reservation))return;
+  const button=document.createElement('button');
+  button.type='button';
+  button.className='mini red';
+  button.textContent='Anular estancia';
+  button.dataset.cancelStay=reservation.id;
+  button.setAttribute('onclick',"cancelPendingParkingStay('"+reservation.id+"')");
+  rendered[index]?.querySelector('.actions')?.append(button);
+ });
+ return template.innerHTML;
+};
 const cancellingPendingStays=new Set();
-async function cancelPendingParkingStay(id){if(cancellingPendingStays.has(id))return;const r=reservations.find(r=>r.id===id);if(!r)return;const paid=r.payment_status==='paid';if(!confirm('¿Anular la reserva '+(r.control_reference||r.reference)+' · '+(r.plate||'sin matrícula')+'? Se retirará del listado de reservas.'+(paid?' Ya está pagada: se conservarán el cobro y la factura. Esta acción no realiza ninguna devolución.':'')))return;cancellingPendingStays.add(id);const buttons=[...document.querySelectorAll('[data-cancel-stay]')].filter(b=>b.dataset.cancelStay===id);buttons.forEach(b=>b.disabled=true);try{const result=await db.rpc('parking_cancel_pending_stay',{p_reservation_id:id});if(result.error)throw result.error;await refreshAll()}catch(e){alert('No se pudo anular la estancia: '+e.message)}finally{cancellingPendingStays.delete(id);buttons.forEach(b=>b.disabled=false)}}
-
+async function cancelPendingParkingStay(id){
+ if(cancellingPendingStays.has(id))return;
+ const reservation=reservations.find(row=>row.id===id);
+ if(!canCancelPendingParkingStay(reservation))return;
+ const paymentWarning=reservation.payment_status==='paid'
+  ? ' Ya está pagada: se conservarán el cobro y la factura. Esta acción no realiza ninguna devolución.'
+  : '';
+ if(!confirm('¿Anular la reserva '+(reservation.control_reference||reservation.reference)+' · '+(reservation.plate||'sin matrícula')+'? Se retirará del listado de reservas.'+paymentWarning))return;
+ cancellingPendingStays.add(id);
+ const buttons=[...document.querySelectorAll('[data-cancel-stay]')].filter(button=>button.dataset.cancelStay===id);
+ buttons.forEach(button=>button.disabled=true);
+ try{
+  const result=await db.rpc('parking_cancel_pending_stay',{p_reservation_id:id});
+  if(result.error)throw result.error;
+  await refreshAll();
+ }catch(error){
+  alert('No se pudo anular la estancia: '+error.message);
+ }finally{
+  cancellingPendingStays.delete(id);
+  buttons.forEach(button=>button.disabled=false);
+ }
+}
 
 /* Route keyboard-wedge voucher scans without submitting the payment. */
 let stayVoucherScan=null;

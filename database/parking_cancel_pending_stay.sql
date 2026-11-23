@@ -4,6 +4,9 @@ declare r public.reservations;ctx jsonb;begin
  select * into r from public.reservations where id=p_reservation_id for update;
  if not found then raise exception 'Reserva no encontrada';end if;
  if r.status='cancelled' then return jsonb_build_object('cancelled',true,'already_cancelled',true);end if;
+ if r.source='web' and r.payment_status='paid' then
+  raise exception 'Las reservas web pagadas no se pueden anular desde Reservas';
+ end if;
  if r.status not in('pending_payment','confirmed') or exists(select 1 from public.parking_sessions where reservation_id=r.id) then raise exception 'Solo se pueden anular reservas sin entrada. Para una estancia iniciada utiliza Finalizar estancia';end if;
  update public.reservations set status='cancelled',assigned_spot_id=null,updated_at=clock_timestamp() where id=r.id;
  insert into public.staff_activity_log(shift_id,user_id,action,entity_type,entity_id,details)values(nullif(ctx->>'shift_id','')::uuid,auth.uid(),'reservation_cancelled','reservation',r.id,jsonb_build_object('reference',r.reference,'plate',r.plate,'previous_status',r.status,'payment_status',r.payment_status,'reason','Anulación manual desde Reservas','payments_preserved',true));
