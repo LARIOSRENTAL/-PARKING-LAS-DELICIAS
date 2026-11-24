@@ -58,6 +58,8 @@
  .page-bg,.intro,#searchCard,#customerCard,.benefits,.story,.gallery,.photo-credit,.footer,.voucher .btn{display:none!important}
  .header{position:static;background:white}.voucher{box-shadow:none;border:0;padding:0}
 }
+.footer{background:#17232e;color:#e7eef4;padding:0 30px 30px}.footer-inner{width:min(1160px,100%);margin:auto;padding:54px 0 48px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(36px,6vw,88px);align-items:start}.footer-column{text-align:center}.footer-column p{margin-left:auto;margin-right:auto}.footer h2{font-size:16px;color:#fff;margin:0 0 24px}.footer p{color:#c4d0da;margin:0 0 15px;font-size:15px;line-height:1.8}.footer a{color:#e7eef4;text-decoration:none}.footer a:hover{text-decoration:underline}.footer-links a{display:block;margin:12px 0;font-size:15px}.footer-bottom{width:min(1160px,100%);margin:0 auto;display:flex;align-items:center;justify-content:center;gap:14px}.footer-social{flex:0 0 auto}.social-link{display:flex;align-items:center;justify-content:center;width:42px;height:42px;margin:0!important;padding:0;border:1px solid rgba(231,238,244,.3);border-radius:50%;background:rgba(255,255,255,.1)}.social-link:hover{background:rgba(255,255,255,.2)}.social-link svg{width:19px;height:19px;fill:currentColor}.copyright{text-align:center;color:#c4d0da;margin:0;font-size:13px}@media(max-width:520px){.footer-bottom{flex-wrap:wrap;gap:10px}.copyright{text-align:center}}@media(max-width:760px){.footer-inner{grid-template-columns:1fr 1fr;gap:34px;padding:42px 0 36px}}@media(max-width:520px){.footer-inner{grid-template-columns:1fr;gap:30px}.footer{padding-left:22px;padding-right:22px}}
+
 </style>
 </head>
 <body>
@@ -141,30 +143,11 @@
 </div>
 <div class="photo-credit">Imágenes de Parking Las Delicias.</div>
 </div></main>
-<footer class="footer" aria-label="Información y enlaces del parking">
-<div class="footer-inner">
-  <section class="footer-column" aria-labelledby="footer-brand">
-    <h2 id="footer-brand">Parking Las Delicias</h2>
-    <p class="footer-company">Parking Las Delicias Málaga, S.L.</p>
-    <p>CIF: B93161842</p>
-    <p class="footer-description">Aparcamiento en el centro de Málaga con personal y videovigilancia las 24 horas. Custodia de llaves cuando la plaza asignada lo requiera.</p>
-  </section>
-  <section class="footer-column" aria-labelledby="footer-contact">
-    <h2 id="footer-contact">Contacto y reservas</h2>
-    <a class="footer-reserve" href="#searchCard"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i> Reservar una plaza <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
-    <div class="footer-contact"><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span>Calle Don Rodrigo, 3<br>29008 Málaga (España)</span></div>
-    <div class="footer-contact"><i class="fa-solid fa-phone" aria-hidden="true"></i><a href="tel:+34952212478">+34 952 212 478</a></div>
-    <div class="footer-contact"><i class="fa-regular fa-envelope" aria-hidden="true"></i><a href="mailto:oficina@parkinglasdelicias.com">oficina@parkinglasdelicias.com</a></div>
-  </section>
-  <nav class="footer-column footer-links" aria-labelledby="footer-legal">
-    <h2 id="footer-legal">Información legal</h2>
-    <a href="condiciones-generales.html"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> Condiciones generales</a>
-    <a href="politica-de-privacidad.html"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Política de privacidad</a>
-    <a href="politica-de-cookies.html"><i class="fa-solid fa-cookie-bite" aria-hidden="true"></i> Política de cookies</a>
-  </nav>
-</div>
-<div class="footer-bottom"><p>© Parking Las Delicias. Todos los derechos reservados.</p><p class="footer-tag"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Abierto las 24 horas</p></div>
-</footer>
+<footer class="footer"><div class="footer-inner">
+<section class="footer-column"><h2>Parking Las Delicias</h2><p>Aparcamiento en el centro de Málaga, con personal y videovigilancia las 24 horas. Custodia de llaves cuando la plaza asignada lo requiera.</p></section>
+<section class="footer-column"><h2>Contacto y reservas</h2><p><a href="index.html#searchCard">Consultar disponibilidad y reservar</a></p><p>Calle Don Rodrigo, 3</p><p>29008 Málaga (España)</p><p><a href="tel:+34952212478">+34 952 212 478</a></p><p><a href="mailto:oficina@parkinglasdelicias.com">oficina@parkinglasdelicias.com</a></p></section>
+<section class="footer-column footer-links"><h2>Legal</h2><a href="politica-de-cookies.html">Política de cookies</a><a href="politica-de-privacidad.html">Política de privacidad</a><a href="condiciones-generales.html">Condiciones generales</a></section>
+</div><div class="footer-bottom"><p class="copyright">© Parking Las Delicias · Abierto 24 horas</p><div class="footer-social"><a class="social-link" href="https://www.facebook.com/parkinglasdelicias?" target="_blank" rel="noopener noreferrer" aria-label="Facebook de Parking Las Delicias"><svg aria-hidden="true" viewBox="0 0 320 512"><path d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06H297V6.26S260.36 0 225.36 0C152.77 0 105.37 44 105.37 123.92v71.42H24.55V288h80.82v224h99.2V288z"/></svg></a></div></div></footer>
 <script>
 const FN='https://vcwbfljcqpqkmuzcpboi.supabase.co/functions/v1/';
 let lastQuote=null,selectedVehicleType='XL';
