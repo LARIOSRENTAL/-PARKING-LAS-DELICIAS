@@ -439,21 +439,35 @@ Deno.serve(async req => {
     const vehicle = String(body.vehicleType || "").toUpperCase();
     const days = Number(body.durationDays);
     const entry = new Date(String(body.entryAt || ""));
+    const requestedExitAt = String(body.exitAt || "");
+    const checkout = new Date(requestedExitAt);
+    const billableDays = Number(body.billableDays || days);
+    const localDate = (value: Date) => {
+      const parts = new Intl.DateTimeFormat("en-CA", {timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(value);
+      return parts.find(part => part.type === "year")!.value + "-" +
+        parts.find(part => part.type === "month")!.value + "-" + parts.find(part => part.type === "day")!.value;
+    };
+    const autoExit = new Date(entry.getTime() + days * 86400000);
     const name = String(body.customerName || "").trim();
     const email = String(body.customerEmail || "").trim().toLowerCase();
     const phone = String(body.customerPhone || "").trim();
     const plate = String(body.plate || "").trim().toUpperCase();
     const model = String(body.vehicleMakeModel || "").trim();
     if (!categories.includes(vehicle) || !Number.isInteger(days) || days < 1 || days > 24 ||
+        !Number.isInteger(billableDays) || billableDays < days || billableDays > 24 ||
         !Number.isFinite(entry.getTime()) || entry.getTime() <= Date.now() || entry.getTime() % 900000 !== 0 ||
+        !Number.isFinite(checkout.getTime()) || checkout <= entry || checkout.getTime() % 900000 !== 0 ||
+        localDate(checkout) !== localDate(autoExit) ||
+        Math.max(days, Math.ceil((checkout.getTime() - entry.getTime()) / 86400000)) !== billableDays ||
         name.length < 2 || name.length > 120 || phone.length < 5 || phone.length > 30 ||
         email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
         (plate.length > 0 && plate.length < 3) || plate.length > 16 || model.length > 120) {
-      return json({error:"Revisa los datos de la reserva y la fecha de entrada."},400);
+      return json({error:"Revisa los datos de la reserva y la fecha de salida."},400);
     }
     const entryAt = entry.toISOString();
-    const {data:quote,error:quoteError} = await db.rpc("quote_public_parking",{
-      p_vehicle_type_code:vehicle,p_entry_at:entryAt,p_duration_days:days,
+    const exitAt = checkout.toISOString();
+    const {data:quote,error:quoteError} = await db.rpc("quote_public_parking_checkout",{
+      p_vehicle_type_code:vehicle,p_entry_at:entryAt,p_billable_days:billableDays,p_exit_at:exitAt,
     });
     if (quoteError) throw quoteError;
     if (!quote?.[0] || quote[0].available_spaces < 1) return json({error:"No hay plazas disponibles."},409);
@@ -466,7 +480,7 @@ Deno.serve(async req => {
 
     const expires = Math.floor(Date.now()/1000) + 31*60;
     const {data:hold,error:holdError} = await db.from("reservations").insert({
-      vehicle_type_id:vt.id,entry_at:entryAt,duration_days:days,customer_name:name,customer_email:email,
+      vehicle_type_id:vt.id,entry_at:entryAt,exit_at:exitAt,duration_days:billableDays,customer_name:name,customer_email:email,
       customer_phone:phone,plate:plate||null,vehicle_make_model:model||null,source:"web",status:"pending_payment",booking_language:language,
       payment_status:"pending",manual_price_override:true,amount_eur:price,
       expires_at:new Date((expires+15*60)*1000).toISOString(),
@@ -481,7 +495,7 @@ Deno.serve(async req => {
       const params = new URLSearchParams({
         mode:"payment", locale:language, "customer_email":email,
         "line_items[0][price_data][currency]":"eur","line_items[0][price_data][unit_amount]":String(cents),
-        "line_items[0][price_data][product_data][name]":"Parking Las Delicias · "+vehicle+" · "+days+" día(s)",
+        "line_items[0][price_data][product_data][name]":"Parking Las Delicias · "+vehicle+" · "+billableDays+" día(s)",
         "line_items[0][quantity]":"1","metadata[parking_reservation]":hold.id,expires_at:String(expires),
         success_url:site+"?pago={CHECKOUT_SESSION_ID}",cancel_url:site+"?pago=cancelado",
       });
