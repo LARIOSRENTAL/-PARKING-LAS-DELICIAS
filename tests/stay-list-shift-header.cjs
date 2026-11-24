@@ -1,8 +1,10 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const htmlSource=fs.readFileSync(__dirname+'/../backoffice/index.html','utf8'),start=htmlSource.indexOf('async function printTotalStays('),end=htmlSource.indexOf('\nasync function ',start+10);const source=htmlSource.slice(start,end);let jobs=[];
+const htmlSource=fs.readFileSync(__dirname+'/../backoffice/index.html','utf8'),start=htmlSource.indexOf('async function printTotalStays('),end=htmlSource.indexOf('\nasync function ',start+10);const source=htmlSource.slice(start,end);let jobs=[],readError;
 const rows=Array.from({length:113},(_,i)=>({vehicle:'TURISMO',plate:'TEST'+i,spot:'A-'+i,start:'2026-11-01T10:00:00Z',end:'2099-12-01T10:00:00Z',presence:'DENTRO'}));
-const ctx={console,Date,Math,Number,currentShift:{id:'wrong',employee_name:'Otro empleado',shift_code:3,shift_date:'2026-11-05'},currentProfile:{full_name:'Perfil actual'},totalStayOrder:'soon',rotationTariffs:[],loadTotalStays:async()=>{ctx.currentShift={employee_name:'Turno cambiado',shift_code:2};ctx.currentProfile.full_name='Perfil cambiado'},totalStayDisplayRows:()=>rows,esc:v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),money:String,alert:message=>{throw Error(message)},sendParkingPrint:async(kind,html,automatic)=>jobs.push({kind,html,automatic}),shouldPreviewParkingPrint:()=>true};
+const ctx={console,Date,Math,Number,currentShift:{id:'wrong',employee_name:'Otro empleado',shift_code:3,shift_date:'2026-11-05'},currentProfile:{full_name:'Perfil actual'},totalStayOrder:'soon',rotationTariffs:[],readTotalStayReportRows:async()=>{if(readError)throw Error('Consulta fallida');ctx.currentShift={employee_name:'Turno cambiado',shift_code:2};ctx.currentProfile.full_name='Perfil cambiado';return{reservations:rows,insideSessions:[]}},totalStayDisplayRows:(_mode,options)=>options.reservations,document:{getElementById:()=>({value:'SIN RESULTADOS'})},esc:v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),money:String,alert:message=>{throw Error(message)},sendParkingPrint:async(kind,html,automatic)=>jobs.push({kind,html,automatic}),shouldPreviewParkingPrint:()=>true};
 vm.createContext(ctx);vm.runInContext(source,ctx);
+const wrapper=fs.readFileSync(__dirname+'/../backoffice/hotel-voucher-print-format.js','utf8').split(' const priorRows=')[1].split(' const priorSend=')[0];
+vm.runInContext('const priorRows='+wrapper,ctx);
 (async()=>{
  const report={employee_name:'Empleado <turno>',shift_code:1,date:'2026-11-05',generated_at:'2026-11-05T05:02:00Z'};
  await ctx.printTotalStays(true,report);assert.equal(jobs.length,1);const {html}=jobs[0];
@@ -12,5 +14,7 @@ vm.createContext(ctx);vm.runInContext(source,ctx);
  assert(!html.includes('Perfil cambiado'));assert(!html.includes('Turno cambiado'));assert(html.includes('Página 3 / 3'));assert(html.includes('Hasta 56 estancias por hoja A4'));assert.equal(jobs[0].kind,'staylist');assert.equal(jobs[0].automatic,true);
  ctx.currentShift={employee_name:'Manual',shift_code:2,shift_date:'2026-11-05'};await ctx.printTotalStays(false);assert(jobs[1].html.includes('Empleado: Manual'));assert(jobs[1].html.includes('Turno 2 · 05/11/2026'));
  ctx.currentShift=null;ctx.currentProfile.full_name='Gerente';await ctx.printTotalStays(false);assert(jobs[2].html.includes('Sin turno operativo'));assert(jobs[2].html.includes('Empleado: Gerente'));
+ assert(jobs[1].html.includes('Total: 0'),'Manual print retains the search filter');assert(html.includes('Total: 113'),'Automatic print ignores the search filter');
+ readError=true;await assert.rejects(ctx.printTotalStays(true,report),/Consulta fallida/);assert.equal(jobs.length,3);
  console.log('Stay list: closing employee/date/time/shift repeated on all pages, captured context survives async refresh, manual/free access headers and print profile retained.');
 })().catch(e=>{console.error(e);process.exitCode=1});

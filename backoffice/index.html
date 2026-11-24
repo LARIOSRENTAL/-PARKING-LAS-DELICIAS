@@ -152,8 +152,10 @@ async function closeShiftAndLogout(){
    report=await readClosingCashbook(shift);if(!report.cash_state?.saved)throw Error('No se pudo confirmar el arqueo guardado. Vuelve a intentarlo.');if(!cashbookCanCarryForward({...report,cash_state:{...report.cash_state,saved:false}}))throw Error('La caja ha cambiado durante la confirmación. Revisa el Resumen de caja antes de cerrar.');
   }
   try{const printReport=await attachCashbookSheetNumber({...report});await Promise.race([sendParkingPrint('cashbook',buildCashbookHtml(printReport),true),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora no responde')),8000))]);}catch(printError){console.warn('Impresión de caja fallida, cierre continúa',printError);}
-  try{await Promise.race([printTotalStays(true,report),new Promise((_,reject)=>setTimeout(()=>reject(Error('Impresora de estancias no responde')),15000))]);}catch(printError){console.warn('Impresión de estancias fallida, cierre continúa',printError);}
+  let stayPrintError;
+  try{await Promise.race([printTotalStays(true,report),new Promise((_,reject)=>setTimeout(()=>reject(Error('Tiempo de espera agotado')),15000))]);}catch(error){stayPrintError=error;console.warn('Impresión de estancias fallida, cierre continúa',error);}
   const res=await db.rpc('parking_close_cash_shift',{p_shift_id:shift.id,p_expected:report});if(res.error)throw Error('No se pudo cerrar el turno: '+res.error.message);
+  if(stayPrintError)alert('Turno cerrado. No se pudo completar la impresión de Total estancias: '+stayPrintError.message+'\nPuedes imprimir el listado desde Estancias → Total estancias.');
   sessionStorage.removeItem('pld_access_mode');await db.auth.signOut();location.reload();
  }catch(e){alert(e.message)}finally{closingShift=false;if(button)button.disabled=false}
 }
@@ -410,7 +412,9 @@ async function saveSubscriberEdit(){if(!['admin','manager'].includes(currentProf
 function calculateSubscriberTotal(){const price=Math.max(0,Number(document.getElementById('subPrice')?.value||0)),discount=Math.min(100,Math.max(0,Number(document.getElementById('subDiscount')?.value||0))),vatPct=Math.min(100,Math.max(0,Number(document.getElementById('subVat')?.value||0))),taxable=price*(1-discount/100),vat=taxable*vatPct/100,total=taxable+vat;subVatAmount.textContent=money(vat);subTotal.textContent=money(total);return {price,discount,vatPct,vat,total}}
 async function createMonthlySubscriber(){if(!['admin','manager'].includes(currentProfile?.role))return alert('Solo administradores y gerentes pueden dar de alta abonados.');const msg=document.getElementById('subscriberFormMsg'),calc=calculateSubscriberTotal(),name=subName.value.trim(),vehicle=subVehicle.value.trim(),plate=subPlate.value.trim().toUpperCase();if(name.length<2||vehicle.length<2||plate.length<3){msg.innerHTML='<div class="msg error">Nombre, vehículo y matrícula son obligatorios.</div>';return}msg.innerHTML='<div class="msg">Creando abono…</div>';const r=await db.rpc('create_monthly_subscriber',{p_customer_name:name,p_tax_id:subTaxId.value.trim(),p_address:subAddress.value.trim(),p_postal_code:subPostal.value.trim(),p_city:subCity.value.trim(),p_phone:subPhone.value.trim(),p_vehicle:vehicle,p_plate:plate,p_price_eur:calc.price,p_discount_pct:calc.discount,p_vat_pct:calc.vatPct,p_notes:subNotes.value.trim(),p_parking_spot_id:subParkingSpot.value||null,p_membership_start_date:subStartDate.value||null});if(r.error){msg.innerHTML='<div class="msg error">'+esc(r.error.message)+'</div>';return}msg.innerHTML='<div class="msg"><b>Abono creado.</b> Total mensual: '+money(r.data.total_eur)+'</div>';[subName,subTaxId,subAddress,subPostal,subCity,subPhone,subVehicle,subPlate,subNotes].forEach(x=>x.value='');subPrice.value='0';subDiscount.value='0';subVat.value='21';subParkingSpot.value='';calculateSubscriberTotal();await loadMonthlySubscribers();showSubscriberPane('list')}
 async function deactivateMonthlySubscriber(id){if(currentProfile?.role!=='admin')return alert('Solo administradores pueden dar de baja abonados.');const x=monthlySubscribers.find(s=>s.id===id);if(!x)return;if(!confirm('¿Dar de baja el abono de '+x.customer_name+' · '+x.plate+'?\n\nEl histórico se conservará.'))return;const r=await db.rpc('deactivate_monthly_subscriber',{p_subscriber_id:id});if(r.error)return alert('No se pudo dar de baja: '+r.error.message);await loadMonthlySubscribers();await loadSpots();alert('Cliente dado de baja correctamente.'+(x.parking_spot_id?' Su plaza queda libre si no tiene otros abonados activos.':' Su plaza aún no tiene un vínculo verificado.'))}
-async function loadReservations(){const r=await db.from('reservation_backoffice').select('*').order('exit_at',{ascending:true});if(r.error){console.error(r.error);return}reservations=(r.data||[]).map(x=>({...x,vehicle_types:{code:x.vehicle_type_code,name:x.vehicle_type_name}}));await loadIssuedParkingInvoices();renderReservations()}
+function reservationRowsQuery(){return db.from('reservation_backoffice').select('*').order('exit_at',{ascending:true}).order('id',{ascending:true})}
+function normalizeReservationRows(rows){return rows.map(x=>({...x,vehicle_types:{code:x.vehicle_type_code,name:x.vehicle_type_name}}))}
+async function loadReservations(){const r=await reservationRowsQuery();if(r.error){console.error(r.error);return}reservations=normalizeReservationRows(r.data||[]);await loadIssuedParkingInvoices();renderReservations()}
 function renderReservations(){const el=document.getElementById('reservationsBody');if(!el)return;const q=(document.getElementById('searchRes')?.value||'').toLowerCase(),now=Date.now();const rows=reservations.filter(r=>!r.last_movement_at&&new Date(r.exit_at).getTime()>now&&!['cancelled','expired','completed'].includes(r.status)).filter(r=>!q||[r.reference,r.customer_name,r.plate,r.vehicle_make_model].some(x=>String(x||'').toLowerCase().includes(q)));el.innerHTML='<div class="muted" style="margin-bottom:10px">Solo reservas pendientes de su primera entrada. Cuando el vehículo entra, pasa al Planning diario y a Vehículos dentro/fuera.</div>'+ (parkingHotels.length?'<div class="panel"><b>Bonos hotel disponibles</b><div class="actions" style="margin-top:8px">'+parkingHotels.map(h=>'<span class="tag green">'+esc(h.name)+' · '+h.available_days+' bonos</span>').join('')+'</div></div>':'')+reservationTable(rows,true)}
 function activeBlockForSpot(spotId){const now=Date.now();return capacityBlocks.find(b=>b.spot_id===spotId&&b.active&&new Date(b.starts_at).getTime()<=now&&new Date(b.ends_at).getTime()>now)}
 function reservedOutsideSpotIds(){const now=Date.now();return new Set(reservations.filter(r=>r.vehicle_presence==='FUERA'&&r.last_movement_at&&r.assigned_spot_id&&new Date(r.exit_at).getTime()>now).map(r=>r.assigned_spot_id))}
@@ -453,17 +457,17 @@ function buildVoucherHtml(r,spotCode,actualEntry,audit){
 function openVoucherWindow(){const w=window.open('','_blank');if(w){w.document.open();w.document.write('<!doctype html><html><body style="font-family:Arial;padding:24px">Preparando bono de entrada…</body></html>');w.document.close()}return w}
 async function printEntryVoucher(win,r,spotCode,actualEntry,audit){const html=buildVoucherHtml(r,spotCode,actualEntry,audit);try{await sendParkingPrint('stay',html);if(win)win.close()}catch(e){console.warn('No se pudo imprimir con RICOH MP 2003:',e);if(win)win.close();alert('La entrada ha quedado registrada, pero el bono NO se ha enviado a RICOH MP 2003 (bandeja 2). Comprueba que QZ Tray está abierto y que la cola RICOH MP 2003 existe. Detalle: '+e.message+'\n\nNo se enviará automáticamente a otra impresora.')}}
 async function checkIn(id){const sel=document.getElementById('spot-'+id);if(!sel?.value)return alert('Selecciona una plaza libre.');const reservation=reservations.find(x=>x.id===id);if(!reservation)return alert('No se ha encontrado la reserva.');const spot=spots.find(x=>x.id===sel.value),actualEntry=new Date().toISOString(),voucherWin=null;const r=await db.rpc('backoffice_check_in',{p_reservation_id:id,p_spot_id:sel.value,p_actual_entry_at:actualEntry});if(r.error){if(voucherWin)voucherWin.close();return alert(r.error.message)}let audit=null;try{audit=await registerIssuedDocument('stay_voucher','reservation',id,{reference:reservation.reference,plate:reservation.plate,spot_code:spot?.code||'',entry_at:actualEntry,exit_at:reservation.exit_at,amount_eur:reservation.amount_eur})}catch(e){if(voucherWin)voucherWin.close();return alert('La entrada se ha registrado, pero no se pudo registrar el bono en el turno: '+e.message)}await refreshAll();await printEntryVoucher(voucherWin,reservation,spot?.code||'',actualEntry,audit)}
-function activeTotalStayRows(){
+function activeTotalStayRows(reservationRows=reservations,sessionRows=insideSessions){
  const now=Date.now(),byId=new Map();
- for(const r of reservations){if(!r.last_movement_at||r.rotation_pending||['cancelled','expired','completed'].includes(r.status)||!r.assigned_spot_id)continue;
+ for(const r of reservationRows){if(!r.last_movement_at||r.rotation_pending||['cancelled','expired','completed'].includes(r.status)||!r.assigned_spot_id)continue;
    if(r.vehicle_presence==='FUERA'&&new Date(r.exit_at).getTime()<=now)continue;
    if(!['DENTRO','FUERA'].includes(r.vehicle_presence))continue;
    const spot=spots.find(s=>s.id===r.assigned_spot_id);
    byId.set(r.id,{reservationId:r.id,reference:r.control_reference||r.reference,spot:spot?.code||'—',plate:r.plate||'—',vehicle:r.vehicle_make_model||r.vehicle_types?.name||'',customer:r.customer_name||'—',notes:r.notes||'',phone:r.customer_phone||'',vehicleType:r.vehicle_types?.code||r.vehicle_type_code||'',start:r.entry_at,end:r.exit_at,presence:r.vehicle_presence});
  }
- for(const x of insideSessions){if(x.billing_mode!=='reservation'||(x.reservation_id&&byId.has(x.reservation_id)))continue;
-  if(x.reservation_id&&reservations.some(r=>r.id===x.reservation_id&&['cancelled','expired','completed'].includes(r.status)))continue;
-  byId.set(x.reservation_id||x.id,{reservationId:x.reservation_id,reference:reservations.find(r=>r.id===x.reservation_id)?.control_reference||reservations.find(r=>r.id===x.reservation_id)?.reference||'—',spot:x.parking_spots?.code||spots.find(s=>s.id===x.spot_id)?.code||'—',plate:x.plate||'—',vehicle:x.vehicle_make_model||'',customer:x.customer_name||'—',notes:reservations.find(r=>r.id===x.reservation_id)?.notes||'',phone:x.customer_phone||'',vehicleType:x.vehicle_types?.code||'',start:x.actual_entry_at||x.planned_entry_at,end:x.planned_exit_at,presence:'DENTRO'});
+ for(const x of sessionRows){if(x.billing_mode!=='reservation'||(x.reservation_id&&byId.has(x.reservation_id)))continue;
+  if(x.reservation_id&&reservationRows.some(r=>r.id===x.reservation_id&&['cancelled','expired','completed'].includes(r.status)))continue;
+  byId.set(x.reservation_id||x.id,{reservationId:x.reservation_id,reference:reservationRows.find(r=>r.id===x.reservation_id)?.control_reference||reservationRows.find(r=>r.id===x.reservation_id)?.reference||'—',spot:x.parking_spots?.code||spots.find(s=>s.id===x.spot_id)?.code||'—',plate:x.plate||'—',vehicle:x.vehicle_make_model||'',customer:x.customer_name||'—',notes:reservationRows.find(r=>r.id===x.reservation_id)?.notes||'',phone:x.customer_phone||'',vehicleType:x.vehicle_types?.code||'',start:x.actual_entry_at||x.planned_entry_at,end:x.planned_exit_at,presence:'DENTRO'});
  }
  return [...byId.values()].sort((a,b)=>(new Date(a.end)-new Date(b.end))||String(a.spot).localeCompare(String(b.spot),'es',{numeric:true}));
 }
@@ -472,8 +476,8 @@ function stayTariffCode(x){const c=String(x.vehicleType||'').toUpperCase(),v=Str
 async function updateStayDebts(scope,items){const stamp=new Date().toISOString();await Promise.all(items.filter(x=>x.end&&new Date(x.end)<new Date(stamp)).map(async x=>{const el=document.getElementById('stay-debt-'+scope+'-'+x.key);if(!el)return;const code=stayTariffCode(x);if(!code){el.textContent='Consultar';return}try{const r=await db.rpc('calculate_rotation_amount',{p_tariff_code:code,p_entry_at:x.end,p_exit_at:stamp});if(el.isConnected)el.textContent=r.error||!Number.isFinite(Number(r.data?.amount_eur))?'Consultar':money(r.data.amount_eur)}catch(e){if(el.isConnected)el.textContent='Consultar'}}))}
 let totalStayOrder='soon';
 function setTotalStayOrder(mode){totalStayOrder=['soon','late','spot'].includes(mode)?mode:'soon';renderTotalStays()}
-function totalStayDisplayRows(mode=totalStayOrder){
- const rows=activeTotalStayRows(),byDate=(a,b)=>new Date(a.end)-new Date(b.end);
+function totalStayDisplayRows(mode=totalStayOrder,{all=false,reservations:reportReservations,insideSessions:reportSessions}={}){
+ const rows=activeTotalStayRows(reportReservations,reportSessions),byDate=(a,b)=>new Date(a.end)-new Date(b.end);
  if(mode==='late')rows.sort((a,b)=>byDate(b,a)||String(a.spot).localeCompare(String(b.spot),'es',{numeric:true}));
  else if(mode==='spot')rows.sort((a,b)=>String(a.spot||'').localeCompare(String(b.spot||''),'es',{numeric:true})||byDate(a,b));
  else rows.sort((a,b)=>byDate(a,b)||String(a.spot).localeCompare(String(b.spot),'es',{numeric:true}));
@@ -491,6 +495,23 @@ function renderTotalStays(){
  updateStayDebts('total',rows.map((x,i)=>({key:i,end:x.presence==='DENTRO'?x.end:null,vehicle:x.vehicle,vehicleType:x.vehicleType})));
 }
 async function loadTotalStays(){await Promise.all([loadReservations(),loadInside()]);await loadOutside();renderTotalStays()}
+async function readTotalStayReportRows(){
+ const pageSize=500;
+ const reportReservations=[];
+ const sessionsQuery=insideStaySessionsQuery();
+ const firstPageQuery=reservationRowsQuery().not('last_movement_at','is',null).range(0,pageSize-1);
+ const [sessions,firstPage]=await Promise.all([sessionsQuery,firstPageQuery]);
+ if(sessions.error||!Array.isArray(sessions.data))throw Error('No se pudieron consultar las estancias dentro del parking: '+(sessions.error?.message||'respuesta incompleta'));
+ let page=firstPage;
+ for(let offset=0;;offset+=pageSize){
+  if(page.error||!Array.isArray(page.data))throw Error('No se pudieron consultar las reservas: '+(page.error?.message||'respuesta incompleta'));
+  reportReservations.push(...page.data);
+  if(page.data.length<pageSize)break;
+  const next=offset+pageSize;
+  page=await reservationRowsQuery().not('last_movement_at','is',null).range(next,next+pageSize-1);
+ }
+ return {reservations:normalizeReservationRows(reportReservations),insideSessions:sessions.data};
+}
 async function printTotalStays(automatic=false,shiftReport=null){
  const printShift=shiftReport?{...shiftReport}:currentShift?{...currentShift}:null;
  const printEmployee=printShift?.employee_name||currentProfile?.full_name||'—';
@@ -500,8 +521,8 @@ async function printTotalStays(automatic=false,shiftReport=null){
  const remotePreview=!automatic&&typeof shouldPreviewParkingPrint==='function'&&shouldPreviewParkingPrint();
  const w=automatic||remotePreview?{close(){}}:window.open('','_blank');if(!w)return alert('Permite ventanas emergentes para imprimir las estancias.');
  try{
-  await loadTotalStays();
-  const rows=totalStayDisplayRows(automatic?'late':totalStayOrder),date=new Date(printTimestamp).toLocaleString('es-ES',{timeZone:'Europe/Madrid',dateStyle:'short',timeStyle:'short'}),within=rows.filter(x=>x.presence==='DENTRO').length;
+  const snapshot=await readTotalStayReportRows();
+  const rows=totalStayDisplayRows(automatic?'late':totalStayOrder,{...snapshot,all:automatic}),date=new Date(printTimestamp).toLocaleString('es-ES',{timeZone:'Europe/Madrid',dateStyle:'short',timeStyle:'short'}),within=rows.filter(x=>x.presence==='DENTRO').length;
   const fmtCompact=v=>v?new Date(v).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
   const days=(x)=>Math.max(1,Math.ceil((new Date(x.end).getTime()-new Date(x.start).getTime())/86400000))||'—';
   const excess=(x)=>{const ms=Date.now()-new Date(x.end).getTime();if(x.presence!=='DENTRO'||!Number.isFinite(ms)||ms<=0)return '—';const mins=Math.ceil(ms/60000);return Math.floor(mins/60)+'h '+String(mins%60).padStart(2,'0')+'m';};
@@ -549,7 +570,8 @@ async function printTotalStays(automatic=false,shiftReport=null){
   try{await sendParkingPrint('staylist',html,automatic);w.close()}catch(printError){if(automatic||remotePreview)throw printError;console.warn('QZ no disponible:',printError);if(confirm('No se pudo enviar a FACTURAS: '+printError.message+'\n\n¿Usar la impresión convencional?')){w.document.open();w.document.write(html);w.document.close()}else w.close()}
  }catch(e){w.close();if(automatic)throw e;alert('No se pudo imprimir el listado: '+e.message)}
 }
-async function loadInside(){const r=await db.from('parking_sessions').select('id,reservation_id,vehicle_type_id,spot_id,plate,vehicle_make_model,customer_name,customer_phone,planned_entry_at,planned_exit_at,actual_entry_at,status,billing_mode,parking_spots(code),vehicle_types(name,code)').eq('status','inside').order('planned_exit_at',{ascending:true});insideSessions=r.data||[];renderInside()}
+function insideStaySessionsQuery(){return db.from('parking_sessions').select('id,reservation_id,vehicle_type_id,spot_id,plate,vehicle_make_model,customer_name,customer_phone,planned_entry_at,planned_exit_at,actual_entry_at,status,billing_mode,parking_spots(code),vehicle_types(name,code)').eq('status','inside').order('planned_exit_at',{ascending:true})}
+async function loadInside(){const r=await insideStaySessionsQuery();insideSessions=r.data||[];renderInside()}
 function insideAttention(s){if(!s.planned_exit_at)return 'normal';const now=Date.now(),end=new Date(s.planned_exit_at).getTime();if(now>end)return 'overdue';if(now>=end-3*3600000)return 'due_soon';return 'normal'}
 function renderInside(){
  const el=document.getElementById('insideBody');if(!el)return;
@@ -664,7 +686,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 
 <script src="authorized-plates.js?v=entry-warning-20261026"></script>
 <script src="hotel-payments.js?v=hotel-vouchers-pending-unpaid-print-20261122"></script>
-<script src="stay-completion.js?v=pending-rotation-entry-ticket-20261120"></script>
+<script src="stay-completion.js?v=stay-list-report-20261124"></script>
 <script src="staff-users.js?v=access-20261017-users-20261016"></script>
 <script src="rotation-spots.js?v=client-keys-20261029"></script>
 <script src="print-profiles.js?v=stay-list-full-a4-20261031"></script>
@@ -675,7 +697,7 @@ db.auth.onAuthStateChange((_event,session)=>{currentSession=session;if(session&&
 <script src="billing-exports.js?v=invoice-columns-20261106"></script>
 <script src="admin-print-preview.js?v=cash-a4-stacked-20261020"></script><datalist id="subscriberSpotChoices"></datalist>
 <script src="stay-workflow.js?v=zone-a-count-20261110"></script>
-<script src="hotel-voucher-print-format.js?v=stored-hotel-name-20261105"></script>
+<script src="hotel-voucher-print-format.js?v=stay-list-report-20261124"></script>
 <script src="subscriber-plates.js?v=complete-20261026"></script>
 <script src="shared-availability.js?v=complete-20261026"></script>
 <script src="commerce-sales-and-unpaid-stays.js?v=protect-paid-web-stays-20261123"></script>

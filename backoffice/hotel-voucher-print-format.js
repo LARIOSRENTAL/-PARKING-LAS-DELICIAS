@@ -64,9 +64,10 @@
  style.textContent='#totalStaySearch{border:3px solid #cf2828!important;background:#fff2f2!important;font-weight:850!important;font-size:17px!important}label[for="totalStaySearch"]{color:#bc1717!important;font-weight:900!important;font-size:16px!important}#spots .spot strong{font-size:23px!important;font-weight:950!important}#spots .spot.free{background:#d5f4de!important;border:2px solid #31925d!important}#spots .spot.busy{background:#ffdddd!important;border:2px solid #c83c3c!important}#spots .spot.reservedOut{background:#ffe09a!important;border:2px solid #ac7000!important}';
  document.head.appendChild(style);
  const priorRows=totalStayDisplayRows;
- totalStayDisplayRows=function(mode){
+ totalStayDisplayRows=function(mode,options){
+  const rows=priorRows(mode,options);
+  if(options?.all)return rows;
   const q=String(document.getElementById('totalStaySearch')?.value||'').trim().toLocaleUpperCase('es');
-  const rows=priorRows(mode);
   return q?rows.filter(r=>[r.plate,r.reference,r.spot,r.vehicle,r.customer].some(v=>String(v||'').toLocaleUpperCase('es').includes(q))):rows;
  };
  const priorSend=sendParkingPrint;
