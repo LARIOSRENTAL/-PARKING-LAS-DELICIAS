@@ -25,13 +25,23 @@ Deno.serve(async (req) => {
     if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 24) return json({ error: "La estancia debe ser de 1 a 24 días" }, 400);
     if (!entryAt || Number.isNaN(Date.parse(entryAt))) return json({ error: "Fecha de entrada no válida" }, 400);
     const entryDate = new Date(entryAt);
-    if (entryDate.getUTCMinutes() % 15 !== 0 || entryDate.getUTCSeconds() !== 0) return json({ error: "La hora de entrada debe ser en intervalos de 15 minutos" }, 400);
+    const requestedExitAt = String(body.exitAt || new Date(entryDate.getTime() + durationDays * 86400000).toISOString());
+    const exitDate = new Date(requestedExitAt);
+    const billableDays = Number(body.billableDays || durationDays);
+    if (entryDate.getUTCMinutes() % 15 !== 0 || entryDate.getUTCSeconds() !== 0 ||
+        !Number.isInteger(billableDays) || billableDays < durationDays || billableDays > 24 ||
+        !Number.isFinite(exitDate.getTime()) || exitDate <= entryDate ||
+        exitDate.getTime() % 900000 !== 0 ||
+        Math.max(durationDays, Math.ceil((exitDate.getTime() - entryDate.getTime()) / 86400000)) !== billableDays) {
+      return json({ error: "Revisa la fecha y hora de salida." }, 400);
+    }
 
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-    const { data, error } = await db.rpc("quote_public_parking", {
+    const { data, error } = await db.rpc("quote_public_parking_checkout", {
       p_vehicle_type_code: vehicleType,
       p_entry_at: entryAt,
-      p_duration_days: durationDays,
+      p_billable_days: billableDays,
+      p_exit_at: requestedExitAt,
     });
     if (error) throw error;
     const q = data?.[0];
@@ -41,6 +51,7 @@ Deno.serve(async (req) => {
       entryAt: q.entry_at,
       exitAt: q.exit_at,
       durationDays: q.duration_days,
+      billableDays: q.duration_days,
       priceEur: Number(q.price_eur),
       availableSpaces: Number(q.available_spaces),
       available: Number(q.available_spaces) > 0,
