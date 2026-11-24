@@ -228,11 +228,33 @@ function closeRotationCheckout(){rotationCheckoutModal.classList.add('hidden');i
 async function confirmRotationCheckout(){if(!currentRotationSession)return closeRotationCheckout();const discount=Math.max(0,Number(rotCheckoutDiscount.value||0)),method=rotCheckoutPayment.value,total=Math.max(0,Number(rotCheckoutTotal.value||0));if(!confirm('¿Confirmar cobro de '+money(total)+' en '+(method==='card'?'tarjeta':'efectivo')+'?'))return;const r=await db.rpc('rotation_check_out',{p_session_id:currentRotationSession.id,p_discount_bono_eur:discount,p_payment_method:method});if(r.error)return alert('No se pudo dar salida: '+r.error.message);closeRotationCheckout();if(Number(r.data.amount_eur)>0)alert('Salida registrada. Total cobrado: '+money(r.data.amount_eur));clearRotationDisplay()}
 function rotationReprint(){alert('El cálculo y la operativa de Rotación ya están activos. Falta que definamos el formato exacto del ticket para activar la reimpresión.')}
 let rotationOccupancyRows=[];
+function rotationOccupiedSpotsByZone(rows,parkingSpots){
+ const normalize=value=>String(value||'').trim().toUpperCase();
+ const zones=new Map(['A','M',...parkingZoneOrder].map(zone=>[zone,0]));
+ const zoneBySpot=new Map();
+ for(const spot of parkingSpots){
+  const code=normalize(spot.code),zone=normalize(spot.zone);
+  if(!code||!zone)continue;
+  zoneBySpot.set(code,zone);
+  if(!zones.has(zone))zones.set(zone,0);
+ }
+ const seen=new Set();
+ for(const row of rows){
+  const code=normalize(row.spot_code);
+  if(!code||seen.has(code))continue;
+  seen.add(code);
+  const zone=zoneBySpot.get(code)||code.match(/^[A-Z]+/)?.[0]||'OTRAS';
+  zones.set(zone,(zones.get(zone)||0)+1);
+ }
+ return zones;
+}
 async function rotationOccupancy(){
  const r=await db.from('rotation_sessions').select('ticket_number,plate,client_text,entry_at,leaves_keys,key_number,spot_code,rotation_tariffs(name)').eq('status','inside').eq('billing_only',false).order('entry_at',{ascending:true});
  if(r.error)return alert(r.error.message);
  rotationOccupancyRows=r.data||[];historyTitle.textContent='Vehículos dentro · Rotación ('+rotationOccupancyRows.length+')';
- historyBody.innerHTML='<div class="field"><label for="rotationOccupancySearch">Buscar matrícula o nº de ticket</label><input id="rotationOccupancySearch" type="search" autocomplete="off" oninput="renderRotationOccupancy()"></div><div id="rotationOccupancyResults"></div>';
+ const zoneCounts=rotationOccupiedSpotsByZone(rotationOccupancyRows,spots);
+ const breakdown=[...zoneCounts].map(([zone,count])=>'<span class="tag">'+esc(zone)+' · '+count+'</span>').join(' ');
+ historyBody.innerHTML='<div class="toolbar"><strong>Plazas ocupadas por rotación</strong><div class="actions">'+breakdown+'</div></div><div class="field"><label for="rotationOccupancySearch">Buscar matrícula o nº de ticket</label><input id="rotationOccupancySearch" type="search" autocomplete="off" oninput="renderRotationOccupancy()"></div><div id="rotationOccupancyResults"></div>';
  renderRotationOccupancy();historyModal.classList.remove('hidden');document.getElementById('rotationOccupancySearch').focus();
 }
 function renderRotationOccupancy(){const q=normalizeRotationPlate(document.getElementById('rotationOccupancySearch').value);document.getElementById('rotationOccupancyResults').innerHTML=rotationOccupancyRows.filter(x=>!q||normalizeRotationPlate(x.plate).includes(q)||String(x.ticket_number).includes(q)).map(x=>'<div class="eventRow"><div class="eventType in">#'+x.ticket_number+'</div><div><b>'+esc(x.plate)+' · '+esc(x.rotation_tariffs?.name||'')+'</b><br><small>Entrada '+fmt(x.entry_at)+(x.spot_code?' · Plaza '+esc(x.spot_code):'')+(x.leaves_keys?' · Deja llaves':' · Sin llaves')+'</small><br>'+esc(x.client_text||'')+' <button class="mini blue" onclick="selectRotationFromList(this)" data-plate="'+esc(x.plate)+'">Ver salida / reimprimir entrada</button></div></div>').join('')||'<div class="muted">No hay vehículos que coincidan.</div>'}
