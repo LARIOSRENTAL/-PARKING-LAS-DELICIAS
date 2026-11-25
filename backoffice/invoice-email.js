@@ -19,10 +19,10 @@
   try{
    const saved=await db.rpc('parking_save_invoice_customer_email',{p_tax_id:invoice.customer_tax_id,p_email:email});if(saved.error)throw saved.error;
    const result=await db.functions.invoke('bank-invoice-mail',{body:{action:'send_customer',invoice_id:invoice.id,recipient:email,pending_payment:invoice.pending_payment===true||invoice.payment_status==='pending'}});
-   if(result.error)throw result.error;
+   if(result.error){let detail='';try{detail=(await result.error.context?.json())?.error||''}catch(_){}throw new Error(detail||result.error.message);}
    if(!result.data?.emailSent)throw new Error(result.data?.error||'El servicio de correo no confirmó el envío.');
-   status.textContent='Factura '+(result.data.invoiceNumber||invoice.number||'')+' enviada a '+email+'.';
-  }catch(e){status.textContent='No se pudo enviar la factura: '+e.message}
+   status.textContent='Envío aceptado por Resend · Factura '+(result.data.invoiceNumber||invoice.number||'')+' · Destinatario: '+email+' · '+new Date().toLocaleString('es-ES')+' · Identificador: '+result.data.providerId+'. Pendiente de confirmar entrega.';status.style.color='#167344';button.textContent='Reenviar factura';
+  }catch(e){status.style.color='#b42318';status.textContent='No se pudo confirmar el envío: '+e.message}
   finally{invoiceEmailBusy=false;button.disabled=false}
  }
  window.sendParkingInvoiceToCustomer=async function(){
@@ -34,7 +34,7 @@
  window.openParkingInvoiceEmail=async function(invoice){
   invoiceForEmail=invoice;const modal=ensureInvoiceEmailModal(),input=document.getElementById('parkingInvoiceRecipient'),status=document.getElementById('parkingInvoiceEmailStatus'),button=document.getElementById('parkingInvoiceEmailSend');
   document.getElementById('parkingInvoiceEmailInfo').textContent='Factura '+(invoice.display_number||invoice.number||'')+(invoice.pending_payment||invoice.payment_status==='pending'?' · pendiente de pago':'');
-  input.value='';status.textContent='';modal.classList.remove('hidden');button.disabled=true;status.textContent='Buscando el correo guardado en la ficha del cliente…';
+  input.value='';status.style.color='';button.textContent='Enviar factura';status.textContent='';modal.classList.remove('hidden');button.disabled=true;status.textContent='Buscando el correo guardado en la ficha del cliente…';
   try{input.value=await lookupEmail(invoice);status.textContent=input.value?'Correo encontrado en la ficha. Al continuar, la factura se enviará directamente.':'La ficha no tiene correo electrónico. Escribe el correo y confirma el envío.'}
   catch(e){status.textContent='No se pudo consultar la ficha: '+e.message+' Puedes indicar el correo manualmente.'}
   button.disabled=false;input.focus();
