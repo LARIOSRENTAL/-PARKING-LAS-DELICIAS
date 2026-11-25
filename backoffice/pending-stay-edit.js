@@ -17,7 +17,7 @@ async function quotePendingStayEdit(){
  try{
   const period=pendingStayPeriod();opsEl('pendingStayEnd').textContent='Fin previsto: '+fmt(new Date(Date.parse(period.entry_at)+period.duration_days*86400000).toISOString());
   let price=state.reservation.amount_eur;
-  if(type!==state.reservation.vehicle_type_id||period.duration_days!==Number(state.reservation.duration_days)||Date.parse(period.entry_at)!==Date.parse(state.reservation.entry_at)){const result=await db.rpc('parking_stay_price',{p_vehicle_type_id:type,p_days:period.duration_days,p_entry_at:period.entry_at});if(result.error)throw result.error;if(result.data===null)throw Error('No hay tarifa para esta categoría y duración.');price=result.data;}
+  if(type!==state.reservation.vehicle_type_id||period.duration_days!==Number(state.reservation.duration_days)||Date.parse(period.entry_at)!==Date.parse(state.reservation.entry_at)){const result=state.reservation.source==='web'?await db.rpc('parking_stay_contract_quote',{p_reservation_id:state.reservation.id,p_days:period.duration_days}):await db.rpc('parking_stay_price',{p_vehicle_type_id:type,p_days:period.duration_days,p_entry_at:period.entry_at});if(result.error)throw result.error;if(result.data===null)throw Error('No hay tarifa para esta categoría y duración.');price=result.data;}
   if(pendingStayEditState!==state||state.serial!==serial||!opsEl('pendingStaySave'))return;
   state.ready=true;opsEl('pendingStayTariffPrice').textContent='Precio de la estancia: '+money(price);opsEl('pendingStaySave').disabled=state.busy;opsEl('parkingOpsMessage').textContent='';
  }catch(e){if(pendingStayEditState===state&&state.serial===serial&&opsEl('parkingOpsMessage'))opsEl('parkingOpsMessage').textContent=e.message;}
