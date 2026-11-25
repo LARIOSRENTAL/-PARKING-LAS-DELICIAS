@@ -44,8 +44,8 @@
   try{
    const result=await db.rpc('parking_stay_payment_document',{p_reservation_id:state.reservation.id,p_entity_type:row.entity_type,p_entity_id:row.entity_id,p_kind:kind,p_customer:customer});
    if(result.error)throw result.error;issued=true;
-   if(kind==='ticket'||result.data.doc_kind==='simplified')await printParkingThermal(buildSimplifiedTicket(result.data));
-   else showParkingInvoicePreview(result.data);
+   if(kind==='ticket')await printParkingThermal(buildSimplifiedTicket(result.data));
+   else await showParkingInvoicePreview(result.data);
    status.textContent='Documento preparado. No se ha realizado ningún nuevo cobro.';
   }catch(e){status.textContent=(issued?'Documento guardado. Puedes volver a imprimirlo sin repetir el cobro. ':'No se pudo generar el documento. ')+e.message;}
   finally{state.paymentDocumentBusy=false;if(stayEditState===state){save.disabled=saveDisabled;buttons.forEach(b=>b.disabled=false);await loadStayPaymentDocuments(state);}}
@@ -73,7 +73,8 @@ function renderStayTicketReport(){
  const rows=stayTicketReportRows.filter(x=>!query||String(x.reference||'').toUpperCase().includes(query)||String(x.plate||'').toUpperCase().includes(query));
  if(!stayTicketReportRows.length){el.innerHTML='<div class="muted">No hay estancias finalizadas en esas fechas.</div>';return}
  if(!rows.length){el.innerHTML='<div class="muted">No se encontraron estancias para esa referencia o matrícula.</div>';return}
- el.innerHTML='<p>'+rows.length+' de '+stayTicketReportRows.length+' estancia(s). Puedes emitir documentos de pagos registrados sin repetir el cobro.</p><div class="tableWrap"><table class="tbl"><thead><tr><th>Referencia</th><th>Matrícula</th><th>Cliente</th><th>Finalizada</th><th>Importe estancia</th><th>Documentos</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.reference||'—')+'</td><td><b>'+esc(x.plate||'—')+'</b><br>'+esc(x.vehicle_make_model||'')+'</td><td>'+esc(x.customer_name||'—')+'</td><td>'+fmt(x.finished_at||x.updated_at)+'</td><td>'+money(x.amount_eur||0)+'</td><td><button class="mini blue" type="button" onclick="loadStayTicketPayments(\''+esc(x.id)+'\')">Tickets / facturas</button><div id="stayTicketPayments_'+esc(x.id)+'" class="stayTicketPayments hidden"></div></td></tr>').join('')+'</tbody></table></div>';
+ el.innerHTML='<p>'+rows.length+' de '+stayTicketReportRows.length+' estancia(s). Los pagos y las facturas aparecen directamente debajo de cada cliente.</p><div class="stayTicketReportList">'+rows.map(x=>'<section class="stayTicketReportCard"><div class="stayTicketReportSummary"><div><b>Ref. '+esc(x.reference||'—')+'</b><br><span>'+esc(x.plate||'—')+(x.vehicle_make_model?' · '+esc(x.vehicle_make_model):'')+'</span></div><div><b>'+esc(x.customer_name||'—')+'</b><br><span>'+fmt(x.finished_at||x.updated_at)+'</span></div><div class="stayTicketAmount">'+money(x.amount_eur||0)+'</div></div><div id="stayTicketPayments_'+esc(x.id)+'" class="stayTicketPayments">Consultando pagos y facturas…</div></section>').join('')+'</div>';
+ rows.forEach(x=>loadStayTicketPayments(x.id));
 }
 async function loadStayTicketReport(){
  const privileged=['admin','manager'].includes(currentProfile?.role),range=rotationCurrentMonth();
@@ -93,16 +94,14 @@ async function loadStayTicketReport(){
 async function loadStayTicketPayments(id){
  const stay=stayTicketReportRows.find(x=>x.id===id),target=opsEl('stayTicketPayments_'+id);
  if(!stay||!target)return;
- target.classList.remove('hidden');target.textContent='Consultando pagos registrados…';
  try{
   const result=await db.rpc('parking_stay_payment_documents',{p_reservation_id:id});
   if(result.error)throw result.error;
   const payments=result.data||[];
-  if(!payments.length){target.textContent='No hay pagos registrados en caja para esta estancia. Los bonos hotel se facturan desde su compra.';return}
-  target.replaceChildren();
-  let extension=0;
+  if(!payments.length){target.innerHTML='<div class="muted">No hay pagos registrados en caja para esta estancia. Los bonos hotel se facturan desde su compra.</div>';return}
+  target.replaceChildren();let extension=0;
   for(const payment of payments){
-   const line=document.createElement('div');line.className='eventRow';
+   const line=document.createElement('div');line.className='stayTicketPaymentRow';
    const info=document.createElement('div');info.innerHTML='<b>'+esc(payment.entity_type==='reservation'?'Estancia inicial':'Ampliación '+(++extension))+'</b><br><small>'+money(payment.amount_eur||0)+' · '+fmt(payment.paid_at)+'</small>';
    const actions=document.createElement('div');actions.className='actions';
    for(const kind of ['ticket','invoice']){
@@ -130,7 +129,7 @@ async function emitStayListDocument(stay,payment,kind,target){
  try{
   const result=await db.rpc('parking_stay_payment_document',{p_reservation_id:stay.id,p_entity_type:payment.entity_type,p_entity_id:payment.entity_id,p_kind:kind,p_customer:customer});
   if(result.error)throw result.error;saved=true;
-  if(kind==='ticket'||result.data.doc_kind==='simplified')await printParkingThermal(buildSimplifiedTicket(result.data));
+  if(kind==='ticket')await printParkingThermal(buildSimplifiedTicket(result.data));
   else await showParkingInvoicePreview(result.data);
   if(status)status.textContent='Documento preparado. No se ha realizado ningún nuevo cobro.';
  }catch(e){if(status)status.textContent=(saved?'Documento guardado; vuelve a pulsar para reimprimirlo. ':'No se pudo preparar el documento. ')+e.message}
