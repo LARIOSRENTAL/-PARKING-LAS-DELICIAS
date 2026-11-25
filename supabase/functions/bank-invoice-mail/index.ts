@@ -82,7 +82,7 @@ Deno.serve(async(req:Request)=>{
    if (!apiKey) return json({error:configError},503);
    const recipient=String(body.recipient||'').trim().toLowerCase();
    const invoiceId=String(body.invoice_id||'').trim();
-   if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient) || recipient.length>254) return json({error:'Introduce un correo electrónico válido.'},400);
+   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length>254) return json({error:'Introduce un correo electrónico válido.'},400);
    if (!/^[0-9a-f-]{36}$/i.test(invoiceId)) return json({error:'No se encontró la factura.'},400);
    const {data:invoice,error:invoiceError}=await admin.from('parking_invoices').select('*').eq('id',invoiceId).maybeSingle();
    if(invoiceError)throw invoiceError;
@@ -97,7 +97,7 @@ Deno.serve(async(req:Request)=>{
      from:invoiceSender,to:[recipient],reply_to:officeMailbox,
      subject:(pending?'Factura pendiente de pago ':'Factura ')+actualInvoice.number+' · Parking Las Delicias',
      html:'<p>Hola '+esc(actualInvoice.customer_name)+',</p><p>'+esc(message)+'</p><p>Gracias,<br>Parking Las Delicias</p>',
-     text:'Hola '+actualInvoice.customer_name+',\\n\\n'+message+'\\n\\nParking Las Delicias',
+     text:'Hola '+actualInvoice.customer_name+',\n\n'+message+'\n\nParking Las Delicias',
      attachments:[{filename:'Factura-'+actualInvoice.number+'.pdf',content:base64(pdf)}]
    };
    const {response,result}=await sendInvoiceEmail(apiKey,payload,'parking-customer-invoice-'+invoiceId+'-'+crypto.randomUUID());
