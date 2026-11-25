@@ -28,7 +28,7 @@
  window.sendParkingInvoiceToCustomer=async function(){
   const invoice=invoiceForEmail,modal=document.getElementById('parkingInvoiceEmailModal');if(!invoice||!modal)return;
   const input=document.getElementById('parkingInvoiceRecipient'),status=document.getElementById('parkingInvoiceEmailStatus'),button=document.getElementById('parkingInvoiceEmailSend'),email=input.value.trim().toLowerCase();
-  if(!email||!/^\\S+@\\S+\\.\\S+$/.test(email)){status.textContent='Introduce un correo electrónico válido.';input.focus();return}
+  if(!email||!/^\S+@\S+\.\S+$/.test(email)){status.textContent='Introduce un correo electrónico válido.';input.focus();return}
   await sendUsingEmail(invoice,email,status,button);
  };
  window.openParkingInvoiceEmail=async function(invoice){
