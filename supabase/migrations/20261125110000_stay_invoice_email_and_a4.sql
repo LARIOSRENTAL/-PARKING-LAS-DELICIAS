@@ -41,7 +41,7 @@ returns text language plpgsql security definer set search_path='' as $$
 declare value text:=nullif(lower(btrim(p_email)),'');
 begin
  if auth.uid() is null or not private.is_staff() then raise exception 'No autorizado';end if;
- if value is not null and (length(value)>254 or value !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$') then raise exception 'Introduce un correo electrónico válido';end if;
+ if value is not null and (length(value)>254 or value !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$') then raise exception 'Introduce un correo electrónico válido';end if;
  update public.parking_invoice_customers set email=value,updated_at=clock_timestamp()
  where tax_key=regexp_replace(upper(coalesce(p_tax_id,'')),'[^A-Z0-9]','','g');
  if not found then raise exception 'No se encontró la ficha fiscal del cliente';end if;
