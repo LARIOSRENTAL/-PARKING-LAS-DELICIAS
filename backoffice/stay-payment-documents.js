@@ -85,7 +85,7 @@ async function loadStayTicketReport(){
  if(!privileged&&(from<range.first||to>range.last))return alert('Puedes consultar tickets únicamente del mes vigente.');
  el.textContent='Consultando estancias finalizadas…';
  try{
-  const result=await db.from('reservations').select('id,reference,plate,customer_name,customer_phone,vehicle_make_model,amount_eur,finished_at,updated_at,status').eq('status','completed').order('finished_at',{ascending:false,nullsFirst:false}).limit(5000);
+  const result=await db.from('reservations').select('id,reference,plate,customer_name,customer_email,customer_phone,vehicle_make_model,amount_eur,finished_at,updated_at,status').eq('status','completed').order('finished_at',{ascending:false,nullsFirst:false}).limit(5000);
   if(result.error)throw result.error;
   stayTicketReportRows=(result.data||[]).filter(x=>{const date=stayTicketLocalDate(x.finished_at||x.updated_at);return date&&date>=from&&date<=to&&(privileged||rotationCurrentMonthContains(x.finished_at||x.updated_at))});
   renderStayTicketReport();
