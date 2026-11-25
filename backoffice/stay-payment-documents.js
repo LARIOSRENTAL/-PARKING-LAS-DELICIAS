@@ -42,7 +42,7 @@
   state.paymentDocumentBusy=true;const buttons=[...opsEl('stayPaymentDocuments').querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
   const save=opsEl('stayEditSave'),saveDisabled=save.disabled;save.disabled=true;status.textContent='Preparando documento…';let issued=false;
   try{
-   const result=await db.rpc('parking_stay_payment_document',{p_reservation_id:state.reservation.id,p_entity_type:row.entity_type,p_entity_id:row.entity_id,p_kind:kind,p_customer:customer});
+   const result=kind==='invoice'&&row.invoice&&[row.invoice.customer_name,row.invoice.customer_tax_id,row.invoice.customer_address].every(v=>String(v||'').trim())?{data:row.invoice}:await db.rpc('parking_stay_payment_document',{p_reservation_id:state.reservation.id,p_entity_type:row.entity_type,p_entity_id:row.entity_id,p_kind:kind,p_customer:customer});
    if(result.error)throw result.error;issued=true;
    if(kind==='ticket')await printParkingThermal(buildSimplifiedTicket(result.data));
    else await showParkingInvoicePreview(result.data);
@@ -119,7 +119,7 @@ async function loadStayTicketPayments(id){
 async function emitStayListDocument(stay,payment,kind,target){
  if(!stay||!payment||!target||target.dataset.busy==='true')return;
  let customer=null;
- if(kind==='invoice'&&!payment.invoice){
+ if(kind==='invoice'&&(!payment.invoice||![payment.invoice.customer_name,payment.invoice.customer_tax_id,payment.invoice.customer_address].every(v=>String(v||'').trim()))){
   customer=await openInvoiceCustomerForm({name:stay.customer_name||'',search:stay.plate||''});
   if(!customer)return;
  }
@@ -128,7 +128,7 @@ async function emitStayListDocument(stay,payment,kind,target){
  const status=target.querySelector('.stayTicketDocumentStatus');if(status)status.textContent='Preparando documento…';
  let saved=false;
  try{
-  if(kind==='invoice'&&payment.invoice&&payment.invoice.doc_kind!=='simplified'){
+  if(kind==='invoice'&&payment.invoice&&[payment.invoice.customer_name,payment.invoice.customer_tax_id,payment.invoice.customer_address].every(v=>String(v||'').trim())){
    await showParkingInvoicePreview(payment.invoice);saved=true;
   }else{
    const result=await Promise.race([db.rpc('parking_stay_payment_document',{p_reservation_id:stay.id,p_entity_type:payment.entity_type,p_entity_id:payment.entity_id,p_kind:kind,p_customer:customer}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('El servidor tardó demasiado en preparar el documento. Vuelve a intentarlo.')),20000))]);
