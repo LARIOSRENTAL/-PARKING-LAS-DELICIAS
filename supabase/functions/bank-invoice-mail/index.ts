@@ -78,6 +78,32 @@ Deno.serve(async(req:Request)=>{
    const error = customerSendingEnabled ? configError : customerMailPaused;
    return json({ready:!error,sender:invoiceSender,error,customerSendingEnabled});
  }
+ if (body.action === 'send_customer') {
+   if (!apiKey) return json({error:configError},503);
+   const recipient=String(body.recipient||'').trim().toLowerCase();
+   const invoiceId=String(body.invoice_id||'').trim();
+   if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient) || recipient.length>254) return json({error:'Introduce un correo electrónico válido.'},400);
+   if (!/^[0-9a-f-]{36}$/i.test(invoiceId)) return json({error:'No se encontró la factura.'},400);
+   const {data:invoice,error:invoiceError}=await admin.from('parking_invoices').select('*').eq('id',invoiceId).maybeSingle();
+   if(invoiceError)throw invoiceError;
+   if(!invoice)return json({error:'La factura ya no está disponible.'},404);
+   const actualInvoice={...invoice,number:invoice.display_number||invoice.number};
+   const pdf=await buildInvoicePdf(actualInvoice,PDFLib,await getInvoiceLogo());
+   const pending=body.pending_payment===true;
+   const message=pending
+     ? 'Adjuntamos la factura '+actualInvoice.number+' correspondiente a los bonos diarios solicitados. La factura está pendiente de pago. Le rogamos que nos envíe el justificante de la transferencia para poder venir a recoger los bonos diarios solicitados.'
+     : 'Adjuntamos la factura '+actualInvoice.number+' correspondiente a su operación con Parking Las Delicias.';
+   const payload:any={
+     from:invoiceSender,to:[recipient],reply_to:officeMailbox,
+     subject:(pending?'Factura pendiente de pago ':'Factura ')+actualInvoice.number+' · Parking Las Delicias',
+     html:'<p>Hola '+esc(actualInvoice.customer_name)+',</p><p>'+esc(message)+'</p><p>Gracias,<br>Parking Las Delicias</p>',
+     text:'Hola '+actualInvoice.customer_name+',\\n\\n'+message+'\\n\\nParking Las Delicias',
+     attachments:[{filename:'Factura-'+actualInvoice.number+'.pdf',content:base64(pdf)}]
+   };
+   const {response,result}=await sendInvoiceEmail(apiKey,payload,'parking-customer-invoice-'+invoiceId+'-'+crypto.randomUUID());
+   if(!response.ok||!result.id)return json({emailSent:false,providerStatus:response.status,error:String(result.message||'El servicio de correo no confirmó el envío').slice(0,800)},502);
+   return json({emailSent:true,recipient,providerId:result.id,invoiceNumber:actualInvoice.number,pdfBytes:pdf.length});
+ }
  if (body.action !== 'process') return json({error:'Acción inválida'},400);
  if (!customerSendingEnabled || !apiKey) {
    return json({ok:true,ready:false,sent:0,blocked:0,failed:0,error:customerSendingEnabled ? configError : customerMailPaused});
