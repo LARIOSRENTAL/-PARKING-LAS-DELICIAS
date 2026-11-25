@@ -8,6 +8,7 @@ async function loadRateConfiguration(){
  const failed=results.find(r=>r.error);if(failed)return alert('No se pudieron cargar las tarifas: '+failed.error.message);
  [tariffs,rotationTariffs,rotationSegments,ratePeriods]=results.map(r=>r.data||[]);
  renderDailyRates();renderHourlyRates();renderRateEditor();
+ const matrix=await db.rpc('parking_office_stay_tariff_matrix');if(!matrix.error&&Array.isArray(matrix.data)){const target=document.getElementById('dailyRatesBody');if(target){const rows=matrix.data,types=vehicleTypes.filter(v=>rows.some(t=>t.vehicle_type_id===v.id));const render=(future)=>'<div class="tableWrap"><table class="rateMatrix"><thead><tr><th>Días</th>'+types.map(v=>'<th>'+esc(v.name)+'</th>').join('')+'</tr></thead><tbody>'+Array.from({length:24},(_,i)=>'<tr><td>'+(i+1)+'</td>'+types.map(v=>{const t=rows.find(x=>x.vehicle_type_id===v.id&&Number(x.days)===i+1);const value=future?t?.future_price_eur:t?.price_eur;return '<td>'+(value==null?'—':money(value))+'</td>'}).join('')+'</tr>').join('')+'</tbody></table></div>';target.innerHTML='<h4>Tarifa de oficina vigente</h4>'+render(false)+(rows.some(x=>x.effective_at)?'<details style="margin-top:12px"><summary><b>Tarifa 2027 programada · 31/12/2026 a las 22:00</b></summary>'+render(true)+'</details>':'');}}
 }
 function renderRateEditor(){
  if(!canManageRates())return;
