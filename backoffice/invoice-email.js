@@ -45,8 +45,10 @@
   window.showParkingInvoicePreview=function(invoice){
    originalPreview(invoice);
    const modal=document.getElementById('parkingInvoicePreview'),toolbar=modal?.firstElementChild;
-   if(!toolbar||toolbar.querySelector('#parkingInvoiceEmailOpen'))return;
-   const button=document.createElement('button');button.id='parkingInvoiceEmailOpen';button.className='btn light';button.textContent='Enviar por correo';button.onclick=()=>window.openParkingInvoiceEmail(window.parkingInvoicePreviewData||invoice);
+   if(!toolbar)return;
+   let button=toolbar.querySelector('#parkingInvoiceEmailOpen');
+   if(!button){button=document.createElement('button');button.id='parkingInvoiceEmailOpen';button.className='btn light';button.textContent='Enviar por correo';}
+   button.onclick=()=>window.openParkingInvoiceEmail(parkingInvoicePreviewData||invoice);
    const close=toolbar.querySelector('button[onclick*="closeParkingInvoicePreview"]');(close?.parentElement||toolbar).insertBefore(button,close||null);
   };
  }
