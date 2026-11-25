@@ -128,11 +128,15 @@ async function emitStayListDocument(stay,payment,kind,target){
  const status=target.querySelector('.stayTicketDocumentStatus');if(status)status.textContent='Preparando documento…';
  let saved=false;
  try{
-  const result=await db.rpc('parking_stay_payment_document',{p_reservation_id:stay.id,p_entity_type:payment.entity_type,p_entity_id:payment.entity_id,p_kind:kind,p_customer:customer});
-  if(result.error)throw result.error;saved=true;
-  if(kind==='ticket')await printParkingThermal(buildSimplifiedTicket(result.data));
-  else await showParkingInvoicePreview(result.data);
+  if(kind==='invoice'&&payment.invoice&&payment.invoice.doc_kind!=='simplified'){
+   await showParkingInvoicePreview(payment.invoice);saved=true;
+  }else{
+   const result=await Promise.race([db.rpc('parking_stay_payment_document',{p_reservation_id:stay.id,p_entity_type:payment.entity_type,p_entity_id:payment.entity_id,p_kind:kind,p_customer:customer}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('El servidor tardó demasiado en preparar el documento. Vuelve a intentarlo.')),20000))]);
+   if(result.error)throw result.error;saved=true;
+   if(kind==='ticket')await printParkingThermal(buildSimplifiedTicket(result.data));
+   else await showParkingInvoicePreview(result.data);
+  }
   if(status)status.textContent='Documento preparado. No se ha realizado ningún nuevo cobro.';
- }catch(e){if(status)status.textContent=(saved?'Documento guardado; vuelve a pulsar para reimprimirlo. ':'No se pudo preparar el documento. ')+e.message}
+ }catch(e){if(status)status.textContent=(saved?'Documento guardado; vuelve a abrirlo sin repetir el cobro. ':'No se pudo preparar el documento. ')+e.message}
  finally{target.dataset.busy='false';buttons.forEach(b=>b.disabled=false);if(stayTicketReportRows.some(x=>x.id===stay.id))await loadStayTicketPayments(stay.id)}
 }
