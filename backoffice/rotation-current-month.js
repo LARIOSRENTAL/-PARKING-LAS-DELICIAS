@@ -34,8 +34,7 @@ rotationReportActions=function(row,privileged){
   try{
    const row=rotationReportRows.find(x=>x.id===id);let result=await db.rpc('parking_rotation_invoice_document',{p_session_id:id,p_customer:null});if(result.error)throw result.error;
    if(result.data.needs_customer){const customer=await openInvoiceCustomerForm({name:row?.client_text||'',search:row?.plate||''});if(!customer)return;result=await db.rpc('parking_rotation_invoice_document',{p_session_id:id,p_customer:customer});if(result.error)throw result.error;}
-   if(result.data.doc_kind==='simplified')await printParkingThermal(buildSimplifiedTicket(result.data));
-   else await sendParkingPrint('invoice',buildParkingInvoiceHtml(result.data));
+   showParkingInvoicePreview(result.data);
   }catch(e){alert('No se pudo imprimir la factura: '+e.message+'. Si ya se emitió, vuelve a pulsar Factura para reimprimirla sin repetir el cobro.');}
   finally{invoiceBusy=false;}
  };
