@@ -146,7 +146,7 @@ async function rotationEntry() {
     reEl('plate').value = '';
     result.client_text=reEl('client').value.trim();
     reEl('client').value = '';
-    try{await printReinforcementTicket(result)}catch(e){reShowMessage('Entrada registrada para '+result.plate+'. No se imprimió: '+e.message+'. No repitas la entrada.',true)}
+    try{await printReinforcementTicket(result);if(String(result.client_text||'').trim())await printReinforcementTicket(result)}catch(e){reShowMessage('Entrada registrada para '+result.plate+'. No se imprimió: '+e.message+'. No repitas la entrada.',true)}
     reEl('plate').focus();
     try{await reloadReinforcementSpots()}catch(e){reShowMessage(reEl('result').textContent+'\nNo se pudo actualizar la lista de plazas: '+e.message,true)}
   } catch (error) {
