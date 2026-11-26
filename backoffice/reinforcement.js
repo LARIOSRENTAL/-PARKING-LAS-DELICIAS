@@ -203,7 +203,7 @@ async function createStay() {
     button.disabled = false;
   }
 }
-async function reprintTicket(){if(!lastReinforcementTicket)return;try{await printReinforcementTicket(lastReinforcementTicket)}catch(e){reShowMessage('No se pudo reimprimir: '+e.message,true)}}
+async function reprintTicket(){try{const ticket=await reCall('parking_reinforcement_latest_rotation_ticket',{p_code:reinforcementCode});if(!ticket)return reShowMessage('Todavía no hay entradas registradas.',true);await sendParkingPrint('ticket',buildRotationEntryTicket(ticket),true);reShowMessage('Ticket reimpreso · '+ticket.plate,false)}catch(e){reShowMessage('No se pudo reimprimir: '+e.message,true)}}
 const esc=reEscape;
 function normalizeRotationPlate(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
 
